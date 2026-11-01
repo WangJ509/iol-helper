@@ -38,6 +38,9 @@ button { cursor: pointer; }
 .steps button[aria-current="step"] { color: var(--ink); border-color: var(--accent); font-weight: 600; }
 .steps button:disabled { opacity: .45; cursor: not-allowed; }
 .spacer { flex: 1; }
+.steps .sh, #resetBtn .sh, .m-only { display: none; }
+.m-help { margin-top: 6px; }
+.m-help ol { padding-left: 18px; margin: 6px 0; }
 .chip { font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
 
 main { padding: 16px; max-width: 1500px; margin: 0 auto; }
@@ -72,7 +75,7 @@ input[type=text], input[type=number], input[type=date], select, textarea {
 /* 上傳 */
 .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center; color: var(--muted); }
 .drop.over { border-color: var(--accent); background: var(--soft); }
-.docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+.docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-top: 12px; }
 .doc { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
 .doc .thumb { height: 170px; background: var(--soft); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .doc .thumb img { max-width: 100%; max-height: 100%; }
@@ -128,7 +131,46 @@ td.flag { color: var(--bad); font-weight: 700; }
 
 @media (max-width: 980px) {
   :root { --header-h: 120px; }
-  .verify { grid-template-columns: 1fr; }
+  .verify { grid-template-columns: minmax(0, 1fr); }
   .viewer { position: sticky; top: var(--header-h); height: 42vh; z-index: 5; }
   .checklist { position: static; height: auto; overflow: visible; }
+}
+
+/* 手機：精簡頂部、原圖可收合、輸入框 16px 避免 iOS 自動放大、按鈕加大觸控範圍 */
+@media (max-width: 640px) {
+  .top-row { padding: 6px 12px; gap: 8px; flex-wrap: nowrap; }
+  .brand { display: none; }
+  .eye-badge { font-size: 18px; padding: 0 10px; border-width: 2.5px; white-space: nowrap; }
+  .eye-badge.none { font-size: 14px; }
+  .chip { white-space: nowrap; }
+  .top-row .spacer { display: none; }
+  #caseChip { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+  #progressChip { margin-left: auto; }
+  #resetBtn { white-space: nowrap; flex: none; }
+  #resetBtn .lg { display: none; } #resetBtn .sh { display: inline; }
+  .steps { padding: 0 6px; }
+  .steps button { flex: 1; padding: 7px 4px; }
+  .steps .lg { display: none; } .steps .sh { display: inline; }
+  .m-only { display: inline-block; }
+  main { padding: 10px; }
+  .card { padding: 12px; }
+  .eye-pick { gap: 10px; }
+  .eye-pick button { padding: 22px 6px; font-size: 22px; }
+  input[type=text], input[type=number], input[type=date], select, textarea { font-size: 16px; padding: 7px 8px; }
+  .btn { padding: 8px 14px; }
+  .btn.sm { padding: 5px 10px; font-size: 14px; min-height: 34px; }
+  .big-check { width: 24px; height: 24px; }
+  .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  label.f > select, label.f > input:not([type=checkbox]):not([type=radio]) { width: 100%; max-width: 100%; }
+  select { text-overflow: ellipsis; }
+  label.row { flex-wrap: nowrap; align-items: flex-start; gap: 8px; }
+  label.row > input { flex: none; margin-top: 4px; }
+  .viewer { height: 36vh; }
+  .viewer.collapsed { height: auto; }
+  .viewer.collapsed .viewer-scroll, .viewer.collapsed #viewerSrc, .viewer.collapsed [data-zoom], .viewer.collapsed #zoomTxt { display: none; }
+  #viewerSrc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-vals input { width: 100px; }
+  .cands label { padding: 5px 9px; }
+  table.t th, table.t td { padding: 4px 3px; font-size: 13px; }
+  .official, .cards { grid-template-columns: 1fr; }
 }

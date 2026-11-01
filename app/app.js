@@ -25,7 +25,7 @@
     docs: [],              // 每頁影像一筆
     items: {},             // 已選定的值（只限手術眼）
     active: null,          // 目前定位 {docId, tokens}
-    viewDoc: null, zoom: 1,
+    viewDoc: null, zoom: 1, viewerCollapsed: false,
     history: { type: '', myopic: 'myopic', tnp: null, tnpDate: '', preK1: null, preK2: null, lvcSE: null, ccp: null, note: '', checked: false },
     lens: { idx: '', A: null, alSource: 'optical', confirmUnclear: false, checked: false },
     plan: { target: 0, SIA: 0, incision: 0, age: null, gender: '', checked: false },
@@ -48,6 +48,7 @@
     $('#progressChip').textContent = `已核對 ${prog.done}/${prog.total}`;
     document.documentElement.style.setProperty('--header-h', $('#top').offsetHeight + 'px');
   }
+  window.addEventListener('resize', () => document.documentElement.style.setProperty('--header-h', $('#top').offsetHeight + 'px'));
   $('#steps').addEventListener('click', e => { const b = e.target.closest('button[data-step]'); if (b && !b.disabled) go(b.dataset.step); });
   $('#resetBtn').addEventListener('click', () => { if (confirm('清除目前所有資料並開新個案？')) { S = fresh(); go('eye'); } });
   window.addEventListener('beforeunload', e => { if (S.docs.length) { e.preventDefault(); e.returnValue = ''; } });
@@ -92,6 +93,7 @@
     const zone = (kind, title, hint) => `
       <div class="card"><h2>${title}</h2><p class="muted small">${hint}</p>
         <div class="drop" data-kind="${kind}">拖曳檔案到這裡，或 <label class="btn sm">選擇檔案<input type="file" accept="image/*,.pdf,.heic" multiple hidden data-kind="${kind}"></label>
+          <label class="btn sm m-only">拍照<input type="file" accept="image/*" capture="environment" hidden data-kind="${kind}"></label>
           <div class="small" style="margin-top:6px">支援 JPG／PNG／PDF（HEIC 需 Safari 或先轉檔）。照片在你的瀏覽器內辨識，不上傳伺服器。</div></div>
         <div class="docs">${S.docs.filter(d => d.kind === kind).map(docCard).join('') || ''}</div></div>`;
     return zone('biometry', '生物測量報告（IOLMaster／Lenstar／A-scan 等）', '可上傳多張（例如同一次量測的多頁）。系統依欄名與數字的行列位置配對，K 與 TK 分開，左右眼依版面判定。') +
@@ -294,10 +296,11 @@
     const items = itemKeys().map(k => S.items[k]);
     const bio = items.filter(i => i.src === 'bio'), ar = items.filter(i => i.src === 'ar');
     return `<div class="verify">
-      <div class="viewer" id="viewer">
+      <div class="viewer${S.viewerCollapsed ? ' collapsed' : ''}" id="viewer">
         <div class="viewer-bar">
           ${bioDocs.map((d, i) => `<button type="button" class="tab" data-view="${d.id}" aria-pressed="${(S.viewDoc || bioDocs[0].id) === d.id}">${d.kind === 'autoref' ? 'Auto' : '生物測量'} ${i + 1}${d.pageCount > 1 ? `-${d.page}` : ''}</button>`).join('')}
           <span class="spacer"></span>
+          <button type="button" class="btn sm m-only" data-collapse>${S.viewerCollapsed ? '展開原圖' : '收合原圖'}</button>
           <button type="button" class="btn sm" data-zoom="-1">－</button><span class="small" id="zoomTxt">${Math.round(S.zoom * 100)}%</span><button type="button" class="btn sm" data-zoom="1">＋</button>
         </div>
         <div class="viewer-scroll" id="viewerScroll"><div class="stage" id="stage"></div></div>
@@ -307,7 +310,7 @@
         ${al.map(a => `<div class="msg ${a.cls}">${esc(a.text)}</div>`).join('')}
         ${other ? `<div class="msg info small">另一眼（${S.eye === 'OD' ? 'OS' : 'OD'}）有 ${other} 個數值，已排除，不會採用。</div>` : ''}
         <div class="sec"><h3>生物測量（${S.eye}）<span class="spacer"></span><span class="prog-line">${bio.filter(i => i.checked).length}/${bio.filter(i => isRequired(i) || isNum(i.value)).length} 已核對</span></h3>
-          <p class="small muted" style="margin:0">K 為角膜前表面 keratometry；TK 為全角膜，兩者分開，不互相替代。點選項目會在左圖標示原圖位置。</p>
+          <p class="small muted" style="margin:0">K 為角膜前表面 keratometry；TK 為全角膜，兩者分開，不互相替代。點選項目會在原圖標示位置。</p>
           ${bio.map(itemHtml).join('')}</div>
         ${ar.length ? `<div class="sec"><h3>Auto refraction（${S.eye}）</h3>${ar.map(itemHtml).join('')}${kCompareHtml()}</div>` : ''}
         ${historyHtml()}
@@ -457,7 +460,14 @@
     if (t.dataset.view) { S.viewDoc = t.dataset.view; S.active = null; drawViewer(); $$('[data-view]').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === S.viewDoc)); }
     if (t.dataset.zoom) { S.zoom = Math.min(4, Math.max(0.5, S.zoom + Number(t.dataset.zoom) * 0.25)); drawViewer(); }
     if (t.dataset.goto) go(t.dataset.goto);
+    if (t.dataset.collapse !== undefined) setCollapsed(!S.viewerCollapsed);
   });
+  function setCollapsed(v) {
+    S.viewerCollapsed = v;
+    const vw = $('#viewer'); if (!vw) return;
+    vw.classList.toggle('collapsed', v);
+    const b = vw.querySelector('[data-collapse]'); if (b) b.textContent = v ? '展開原圖' : '收合原圖';
+  }
   document.addEventListener('focusin', e => { const f = e.target.closest && e.target.closest('[data-focus]'); if (f) focusItem(f.dataset.focus); });
 
   function rerenderChecklist() {
@@ -489,6 +499,7 @@
   function focusItem(key) {
     const it = S.items[key];
     if (!it) return;
+    if (S.viewerCollapsed) setCollapsed(false);   // 手機收合原圖時，點項目自動展開
     $$('.item.active').forEach(x => x.classList.remove('active'));
     const el = $(`.item[data-focus="${key}"]`); if (el) el.classList.add('active');
     const cand = it.cands.find(x => x.c.id === it.candId) || it.cands[0];
@@ -615,7 +626,12 @@
       ${toric}${post}
       <div class="card"><h2>官方網站：一鍵填入</h2>
         <ol class="small">
-          <li>第一次使用：把這個按鈕拖曳到瀏覽器書籤列 → <a class="bm" id="bmLink" href="#">IOL 小幫手填入</a>（只需安裝一次）</li>
+          <li>第一次使用：把這個按鈕拖曳到瀏覽器書籤列 → <a class="bm" id="bmLink" href="#">IOL 小幫手填入</a>（只需安裝一次）
+            <details class="m-help"><summary>手機或平板無法拖曳？</summary>
+              <ol><li>按 <button class="btn sm" id="bmCopy" type="button">複製書籤程式碼</button></li>
+                <li>把目前這頁加入書籤（Safari：分享 › 加入書籤；Chrome：⋮ › ☆）。</li>
+                <li>編輯那個書籤：名稱改成「IOL 小幫手填入」，網址整段刪掉，貼上剛才複製的內容後儲存。</li>
+                <li>在官網分頁使用：Safari 從書籤列表點它；Chrome 在網址列輸入「IOL 小幫手填入」，點選書籤建議項目。</li></ol></details></li>
           <li>按下方「複製資料並開啟官網」，會複製這個個案已核對的資料並開新分頁。</li>
           <li>在官網分頁點書籤列的「IOL 小幫手填入」，欄位會自動填入並以橘框標示，右上角列出已填與未填欄位。</li>
           <li>核對後由你自己按 Calculate。網站的使用條款、驗證碼請自行處理。</li>
@@ -640,7 +656,8 @@
   }
   document.addEventListener('click', async e => {
     const t = e.target;
-    if (t.id === 'bmLink') { e.preventDefault(); alert('請把這個按鈕「拖曳」到瀏覽器的書籤列，不要直接點。'); }
+    if (t.id === 'bmLink') { e.preventDefault(); alert('請把這個按鈕「拖曳」到瀏覽器的書籤列，不要直接點。手機請用下方「複製書籤程式碼」。'); }
+    if (t.id === 'bmCopy') { const ok = await copyText(bookmarkletHref()); t.textContent = ok ? '已複製' : '複製失敗'; }
     if (t.dataset.copy) {
       const site = OFFICIAL[t.dataset.copy];
       const data = payload(S.officialKSet);
