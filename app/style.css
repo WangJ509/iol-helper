@@ -89,7 +89,7 @@ input[type=text], input[type=number], input[type=date], select, textarea {
 .viewer-bar { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .viewer-bar .tab { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 2px 8px; font-size: 13px; }
 .viewer-bar .tab[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.viewer-scroll { flex: 1; overflow: auto; background: var(--soft); }
+.viewer-scroll { flex: 1; overflow: auto; background: var(--soft); touch-action: pan-x pan-y; }   /* 雙指縮放由程式處理，只放大圖片 */
 .stage { position: relative; margin: 0 auto; }
 .stage img { display: block; width: 100%; user-select: none; }
 .ov { position: absolute; border: 1.5px solid var(--box); border-radius: 2px; pointer-events: none; }
@@ -168,6 +168,7 @@ td.flag { color: var(--bad); font-weight: 700; }
   .viewer { height: 36vh; }
   .viewer.collapsed { height: auto; }
   .viewer.collapsed .viewer-scroll, .viewer.collapsed #viewerSrc, .viewer.collapsed [data-zoom], .viewer.collapsed #zoomTxt { display: none; }
+  .ov.hl { border-width: 1.5px; margin: -1px; padding: 1px; box-shadow: none; }
   #viewerSrc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .item-vals input { width: 100px; }
   .cands label { padding: 5px 9px; }

@@ -458,7 +458,7 @@
     const f = t.closest('[data-focus]');
     if (f && !t.closest('input[type=checkbox]')) focusItem(f.dataset.focus);
     if (t.dataset.view) { S.viewDoc = t.dataset.view; S.active = null; drawViewer(); $$('[data-view]').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === S.viewDoc)); }
-    if (t.dataset.zoom) { S.zoom = Math.min(4, Math.max(0.5, S.zoom + Number(t.dataset.zoom) * 0.25)); drawViewer(); }
+    if (t.dataset.zoom) { S.zoom = Math.min(6, Math.max(0.5, S.zoom + Number(t.dataset.zoom) * 0.25)); drawViewer(); }
     if (t.dataset.goto) go(t.dataset.goto);
     if (t.dataset.collapse !== undefined) setCollapsed(!S.viewerCollapsed);
   });
@@ -507,6 +507,32 @@
     if (cand && S.viewDoc !== cand.d.id) { S.viewDoc = cand.d.id; $$('[data-view]').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === S.viewDoc)); }
     drawViewer(true);
   }
+
+  /* 雙指縮放只作用在原圖：改 stage 寬度，並讓兩指中心點保持在原位 */
+  let pinch = null;
+  const touchDist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  document.addEventListener('touchstart', e => {
+    const sc = e.target.closest && e.target.closest('#viewerScroll');
+    if (!sc || e.touches.length !== 2) return;
+    const r = sc.getBoundingClientRect();
+    pinch = { sc, d0: touchDist(e.touches), z0: S.zoom,
+      cx: (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy: (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top };
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!pinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    const stage = $('#stage'); if (!stage) return;
+    const { sc, cx, cy } = pinch;
+    const z = Math.min(6, Math.max(0.5, pinch.z0 * touchDist(e.touches) / pinch.d0));
+    const ratio = z / S.zoom;
+    const px = sc.scrollLeft + cx, py = sc.scrollTop + cy;
+    S.zoom = z;
+    stage.style.width = (z * 100) + '%';
+    sc.scrollLeft = px * ratio - cx; sc.scrollTop = py * ratio - cy;
+    $('#zoomTxt').textContent = Math.round(z * 100) + '%';
+  }, { passive: false });
+  document.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+  document.addEventListener('gesturestart', e => { if (e.target.closest && e.target.closest('#viewerScroll')) e.preventDefault(); });   // iOS Safari 的整頁縮放手勢
 
   function drawViewer(scrollTo) {
     const stage = $('#stage'); if (!stage) return;
