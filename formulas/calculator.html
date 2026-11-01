@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IOL 公式試算</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2430; --muted: #5d6878; --line: #d9dee6;
+  --accent: #1f6feb; --od: #b42318; --os: #1849a9; --warn-bg: #fff4e5; --warn: #8a4b00;
+  --ok: #067647; --own: #eef4ff; --off: #f2f2f2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161c; --panel: #1b2129; --ink: #e6e9ee; --muted: #9aa5b4; --line: #2e3742;
+    --accent: #5b9dff; --od: #ff7a6b; --os: #7aa7ff; --warn-bg: #3a2a10; --warn: #ffc56b;
+    --ok: #4ade80; --own: #1d2a40; --off: #232a33;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0; }
+.eye { font-weight: 700; font-size: 18px; padding: 2px 12px; border-radius: 6px; border: 2px solid currentColor; }
+.eye.od { color: var(--od); } .eye.os { color: var(--os); }
+.seg button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 4px 12px; cursor: pointer; font: inherit; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+main { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+h2 { font-size: 15px; margin: 0 0 8px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); gap: 2px; }
+input, select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; width: 100%; }
+.check { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); }
+.check input { width: auto; }
+.note { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.warn { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 6px 10px; font-size: 13px; margin: 6px 0 0; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: right; font-size: 13px; }
+th:first-child, td:first-child { text-align: left; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--own); }
+.card h3 { margin: 0 0 2px; font-size: 14px; }
+.card .big { font-size: 22px; font-weight: 700; }
+.card.err { background: var(--off); color: var(--muted); }
+.tag { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.off-list li { margin: 2px 0; }
+.cmp td.diff { font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>IOL 公式試算（公開公式）</h1>
+  <div class="seg" role="group" aria-label="手術眼">
+    <button type="button" data-eye="OD" aria-pressed="true">右眼 OD</button><button type="button" data-eye="OS" aria-pressed="false">左眼 OS</button>
+  </div>
+  <span id="eyeBadge" class="eye od">OD 右眼</span>
+  <span class="tag">平台計算・非官網原始結果</span>
+</header>
+
+<main>
+<div>
+  <section>
+    <h2>鏡片與常數</h2>
+    <div class="grid">
+      <label style="grid-column: span 2">鏡片（依 IOL constant.pdf）<select id="lens"></select></label>
+      <label>眼軸來源<select id="alSource"><option value="optical">IOLMaster（光學）→ SRK/T 欄</option><option value="ascan">A-scan → A-scan 欄</option></select></label>
+      <label>使用的 A 常數<input id="A" type="number" step="0.01"></label>
+      <label>目標屈光 (D)<input id="target" type="number" step="0.25" value="0"></label>
+      <label>度數間距<select id="step"><option>0.5</option><option>0.25</option></select></label>
+    </div>
+    <div id="constMsg"></div>
+    <details><summary class="note">Haigis 常數（原表沒有，需自行輸入）</summary>
+      <div class="grid" style="margin-top:6px">
+        <label>a0<input id="a0" type="number" step="0.001"></label>
+        <label>a1<input id="a1" type="number" step="0.001"></label>
+        <label>a2<input id="a2" type="number" step="0.001"></label>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>量測 A（例：IOLMaster）</h2>
+    <div class="grid">
+      <label>AL (mm)<input id="AL" type="number" step="0.01"></label>
+      <label>ACD (mm)<input id="ACD" type="number" step="0.01"></label>
+      <label>K1 (D)<input id="K1" type="number" step="0.01"></label>
+      <label>K1 軸 (°)<input id="K1ax" type="number" step="1"></label>
+      <label>K2 (D)<input id="K2" type="number" step="0.01"></label>
+      <label>K2 軸 (°)<input id="K2ax" type="number" step="1"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>量測 B（例：近期 auto refraction 的 K）</h2>
+    <div class="grid">
+      <label>K1 (D)<input id="bK1" type="number" step="0.01"></label>
+      <label>K1 軸 (°)<input id="bK1ax" type="number" step="1"></label>
+      <label>K2 (D)<input id="bK2" type="number" step="0.01"></label>
+      <label>K2 軸 (°)<input id="bK2ax" type="number" step="1"></label>
+      <label>auto 驗光 CYL (D)<input id="bCYL" type="number" step="0.25"></label>
+    </div>
+    <p class="note">AL、ACD 沿用量測 A，只替換 K，方便並列比較。</p>
+  </section>
+
+  <section>
+    <h2>Toric（平台估算）</h2>
+    <div class="grid">
+      <label>SIA (D)<input id="SIA" type="number" step="0.05" value="0"></label>
+      <label>切口位置 (°)<input id="incision" type="number" step="1" value="0"></label>
+      <label class="check" style="grid-column: span 2"><input id="ak" type="checkbox" checked>以 Abulafia-Koch 迴歸估算後表面散光</label>
+      <label style="grid-column: span 2">IOL 平面柱鏡選項（名稱=度數，逗號分隔）<input id="cyls" value="T2=1.0, T3=1.5, T4=2.25, T5=3.0, T6=3.75, T7=4.5"></label>
+    </div>
+    <p class="note">預設 T 系列柱鏡值僅為範例，請依實際鏡片規格修改。</p>
+  </section>
+
+  <section>
+    <h2>屈光手術史</h2>
+    <div class="grid">
+      <label style="grid-column: span 2">手術<select id="lvc"><option value="">無</option><option value="myopic">近視 LASIK／PRK</option><option value="hyperopic">遠視 LASIK／PRK</option><option value="rk">RK</option></select></label>
+      <label>屈光手術矯正量 SE (D)<input id="lvcSE" type="number" step="0.25" placeholder="近視矯正為負值"></label>
+      <label>術前 K（若有）<input id="preK" type="number" step="0.01"></label>
+      <label>Atlas 中央角膜度數 (D)<input id="ccp" type="number" step="0.01"></label>
+      <label>Pentacam TNP_Apex_4.0 mm<input id="tnp" type="number" step="0.01"></label>
+    </div>
+  </section>
+</div>
+
+<div>
+  <section id="alerts" hidden></section>
+  <section><h2>一般眼：量測 A</h2><div id="resA" class="cards"></div></section>
+  <section id="cmpSec" hidden><h2>量測 A vs 量測 B（只換 K）</h2><div id="cmp"></div></section>
+  <section><h2>Toric 估算</h2><div id="toric"></div></section>
+  <section id="postSec" hidden><h2>屈光術後（已公開方法）</h2><div id="post"></div></section>
+  <section>
+    <h2>不在平台計算、須用官網的公式</h2>
+    <ul class="off-list note">
+      <li>Barrett Universal II、Barrett Toric（APACRS）：作者未公開方程式</li>
+      <li>Kane、EVO、Hill-RBF、Hoffer QST、Cooke K6、PEARL-DGS（ESCRS）：未公開或為訓練模型；PEARL-DGS 開源程式不含訓練係數</li>
+      <li>Barrett True-K、Potvin-Hill Pentacam、Shammas-PL 原式（ASCRS）：未找到可查證的公開方程式</li>
+    </ul>
+  </section>
+</div>
+</main>
+
+<script src="iol-constants.js"></script>
+<script src="iol-formulas.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const num = id => { const v = $(id).value.trim(); return v === '' ? NaN : Number(v); };
+const f2 = x => (Number.isFinite(x) ? (x > 0 ? '+' : '') + x.toFixed(2) : '—');
+const p2 = x => (Number.isFinite(x) ? x.toFixed(2) : '—');
+let eye = 'OD';
+
+document.querySelectorAll('[data-eye]').forEach(b => b.addEventListener('click', () => {
+  eye = b.dataset.eye;
+  document.querySelectorAll('[data-eye]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  const badge = $('eyeBadge');
+  badge.textContent = eye === 'OD' ? 'OD 右眼' : 'OS 左眼';
+  badge.className = 'eye ' + eye.toLowerCase();
+}));
+
+const lensSel = $('lens');
+lensSel.innerHTML = '<option value="">— 選擇鏡片 —</option>' + IOL_CONSTANTS.map((c, i) =>
+  `<option value="${i}" ${c.status === 'excluded' ? 'disabled' : ''}>${c.maker} ${c.model}　(A-scan ${c.ascan ?? '缺'} / SRK/T ${c.srkt ?? '缺'})</option>`).join('');
+
+function syncConstant() {
+  const c = IOL_CONSTANTS[lensSel.value];
+  const msg = [];
+  if (c) {
+    const col = $('alSource').value === 'ascan' ? 'ascan' : 'srkt';
+    const v = c[col];
+    $('A').value = v ?? '';
+    if (v == null) msg.push(`原表「${col === 'ascan' ? 'A-scan' : 'SRK/T'}」欄沒有此鏡片的數值，不自動補值，請確認後手動輸入。`);
+    if (c.status === 'unclear') msg.push(`來源需確認：${c.note}`);
+    else if (c.note) msg.push(`原表備註：${c.note}`);
+  }
+  $('constMsg').innerHTML = msg.map(m => `<p class="warn">${m}</p>`).join('');
+  render();
+}
+lensSel.addEventListener('change', syncConstant);
+$('alSource').addEventListener('change', syncConstant);
+document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', render));
+
+function formulasFor(K, extra) {
+  const base = Object.assign({ AL: num('AL'), ACD: num('ACD'), K, A: num('A') }, extra || {});
+  const list = [
+    ['SRK/T', () => IOLFormulas.srkt(base)],
+    ['Holladay 1', () => IOLFormulas.holladay1(base)],
+    ['Hoffer Q', () => IOLFormulas.hofferQ(base)],
+    ['Haigis', () => IOLFormulas.haigis(Object.assign({ a0: num('a0'), a1: num('a1'), a2: num('a2') }, base))],
+  ];
+  return list.map(([name, mk]) => { try { return { name, f: mk() }; } catch (e) { return { name, err: e.message }; } });
+}
+
+function card(name, f, err, sub) {
+  if (err) return `<div class="card err"><h3>${name}</h3><div class="note">${err}</div></div>`;
+  const t = IOLFormulas.powerTable(f, num('target') || 0, Number($('step').value));
+  return `<div class="card"><h3>${name}</h3>${sub ? `<div class="note">${sub}</div>` : ''}
+    <div class="big">${p2(t.exact)} D</div><div class="note">達目標屈光的精確度數｜ELP ${p2(f.ELP)} mm</div>
+    <table><tr><th>IOL</th><th>預測屈光</th></tr>${t.rows.map(r => `<tr><td>${p2(r.power)}</td><td>${f2(r.refraction)}</td></tr>`).join('')}</table></div>`;
+}
+
+function render() {
+  const K1 = num('K1'), K2 = num('K2');
+  const Km = (K1 + K2) / 2;
+  const alerts = [];
+  const bK1 = num('bK1'), bK2 = num('bK2');
+  if (Math.abs(num('bCYL')) > 1) alerts.push('auto 驗光 |CYL| > 1 D，請評估 toric。');
+  if (Number.isFinite(Km) && Km < 40) alerts.push('平均 K < 40 D，請確認是否有屈光手術史。');
+  $('alerts').hidden = !alerts.length;
+  $('alerts').innerHTML = alerts.map(a => `<p class="warn">${a}</p>`).join('');
+
+  const target = num('target') || 0;
+  $('resA').innerHTML = Number.isFinite(Km)
+    ? formulasFor(Km).map(x => card(x.name, x.f, x.err)).join('')
+    : '<p class="note">請輸入 AL、K1、K2 與 A 常數。</p>';
+
+  const bKm = (bK1 + bK2) / 2;
+  $('cmpSec').hidden = !(Number.isFinite(bKm) && Number.isFinite(Km));
+  if (!$('cmpSec').hidden) {
+    const A = formulasFor(Km), B = formulasFor(bKm);
+    $('cmp').innerHTML = `<p class="note">平均 K：A ${p2(Km)} D｜B ${p2(bKm)} D｜差 ${f2(bKm - Km)} D${Math.abs(bKm - Km) > 0.5 ? '（> 0.5 D，請確認量測品質）' : ''}</p>
+      <table class="cmp"><tr><th>公式</th><th>A：度數</th><th>B：度數</th><th>差</th></tr>
+      ${A.map((a, i) => { const pa = a.f ? a.f.power(target) : NaN, pb = B[i].f ? B[i].f.power(target) : NaN;
+        return `<tr><td>${a.name}</td><td>${p2(pa)}</td><td>${p2(pb)}</td><td class="diff">${f2(pb - pa)}</td></tr>`; }).join('')}</table>`;
+  }
+
+  // Toric
+  try {
+    const cyls = $('cyls').value.split(',').map(s => s.split('=')).filter(p => p.length === 2)
+      .map(([n, c]) => ({ name: n.trim(), cyl: Number(c) })).filter(c => Number.isFinite(c.cyl));
+    const plan = IOLFormulas.toricPlan({ K1, K1axis: num('K1ax'), K2, K2axis: num('K2ax'), AL: num('AL'), A: num('A'),
+      SIA: num('SIA'), incisionAxis: num('incision'), usePosteriorRegression: $('ak').checked, cylinders: cyls });
+    const ax = a => Math.round(a) === 0 ? 180 : Math.round(a);
+    $('toric').innerHTML = `<p class="note">前表面 ${p2(plan.anterior.mag)} D @${ax(plan.anterior.axis)}°｜估算總角膜 ${p2(plan.total.mag)} D @${ax(plan.total.axis)}°｜含 SIA 淨散光 ${p2(plan.net.mag)} D @${ax(plan.net.axis)}°</p>
+      <p><b>建議軸向：${ax(plan.placementAxis)}°</b>　<span class="note">IOL→角膜平面比值 ${plan.ratio.toFixed(3)}（以 SRK/T ELP 計）</span></p>
+      <table><tr><th>型號</th><th>IOL 平面柱鏡</th><th>角膜平面</th><th>殘餘散光</th></tr>
+      ${plan.options.map(o => `<tr><td>${o.name}</td><td>${p2(o.cylIOL)}</td><td>${p2(o.cylCornea)}</td><td>${p2(o.residual)} @${ax(o.residualAxis)}°</td></tr>`).join('')}</table>
+      <p class="note">此為向量運算＋Abulafia-Koch 的平台估算，不是 Barrett Toric。合成資料測試與 Barrett Toric 官網的殘餘散光差約 0.1 D。</p>`;
+  } catch (e) { $('toric').innerHTML = `<p class="note">${e.message}</p>`; }
+
+  // 屈光術後
+  const lvc = $('lvc').value;
+  $('postSec').hidden = !lvc;
+  if (lvc) {
+    const out = [];
+    const preK = num('preK'), lvcSE = num('lvcSE'), ccp = num('ccp');
+    if (lvc === 'myopic') {
+      try {
+        const hl = IOLFormulas.haigisL({ AL: num('AL'), ACD: num('ACD'), K: Km, a0: num('a0'), a1: num('a1'), a2: num('a2') });
+        out.push(card('Haigis-L', hl, null, `校正半徑 ${p2(hl.Rcorr)} mm（${p2(hl.Kcorr)} D）`));
+      } catch (e) { out.push(card('Haigis-L', null, e.message)); }
+      if (Number.isFinite(Km)) {
+        const kc = IOLFormulas.shammasKc(Km);
+        try { out.push(card('Shammas 校正 K＋Haigis', IOLFormulas.haigis({ AL: num('AL'), ACD: num('ACD'), K: kc, a0: num('a0'), a1: num('a1'), a2: num('a2') }), null, `Kc = 1.14×K − 6.8 = ${p2(kc)} D；非 Shammas-PL 原式`)); }
+        catch (e) { out.push(card('Shammas 校正 K＋Haigis', null, `Kc = ${p2(kc)} D；${e.message}`)); }
+      }
+      if (Number.isFinite(ccp)) {
+        const kc = IOLFormulas.wkmKc(ccp);
+        const dk = Number.isFinite(preK) ? preK : 43.86;
+        try { out.push(card('Wang-Koch-Maloney＋Double-K Holladay 1', IOLFormulas.holladay1({ AL: num('AL'), K: kc, Kelp: dk, A: num('A') }), null, `Kc = ${p2(kc)} D；ELP 用 K ${p2(dk)}${Number.isFinite(preK) ? '' : '（無術前 K，用 43.86 預設）'}`)); }
+        catch (e) { out.push(card('Wang-Koch-Maloney', null, e.message)); }
+      }
+    }
+    if ((lvc === 'myopic' || lvc === 'hyperopic') && Number.isFinite(lvcSE) && Number.isFinite(Km)) {
+      try {
+        const base = IOLFormulas.srkt({ AL: num('AL'), K: Km, A: num('A') }).power(target);
+        const m = IOLFormulas.masketAdjust(lvcSE), mm = IOLFormulas.modMasketAdjust(lvcSE);
+        out.push(`<div class="card"><h3>Masket／Modified Masket</h3><div class="note">以術後 K 的 SRK/T ${p2(base)} D 為基礎</div>
+          <table><tr><td>Masket</td><td>${p2(base + m)} D（${f2(m)}）</td></tr><tr><td>Modified Masket</td><td>${p2(base + mm)} D（${f2(mm)}）</td></tr></table>
+          <p class="warn">文獻對 ΔMR 正負號寫法不一致，此處採 EyeWiki：近視矯正 SE 為負值。使用前請核對原文。</p></div>`);
+      } catch (e) { out.push(card('Masket', null, e.message)); }
+    }
+    if (Number.isFinite(num('tnp'))) out.push(`<div class="card err"><h3>Potvin-Hill Pentacam</h3><div class="note">已記錄 TNP_Apex_4.0 mm = ${p2(num('tnp'))} D；迴歸係數未公開取得，需由 ASCRS 官網計算。</div></div>`);
+    if (lvc === 'rk') out.push('<p class="warn">RK 術後：平台目前沒有可查證的公開方法，請用 ASCRS 官網。</p>');
+    $('post').innerHTML = `<div class="cards">${out.join('')}</div>`;
+  }
+}
+render();
+</script>
+</body>
+</html>

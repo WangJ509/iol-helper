@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>IOL 核對小幫手</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="top" id="top">
+  <div class="top-row">
+    <span class="brand">IOL 核對小幫手</span>
+    <span id="eyeBadge" class="eye-badge none">尚未選擇手術眼</span>
+    <span id="caseChip" class="chip" hidden></span>
+    <span class="spacer"></span>
+    <span id="progressChip" class="chip" hidden></span>
+    <button class="btn sm" id="resetBtn" type="button">開新個案</button>
+  </div>
+  <nav class="steps" id="steps" aria-label="步驟">
+    <button type="button" data-step="eye">1 選擇手術眼</button>
+    <button type="button" data-step="upload">2 上傳報告</button>
+    <button type="button" data-step="verify">3 核對量測資料</button>
+    <button type="button" data-step="calc">4 計算與官網</button>
+  </nav>
+</div>
+<main id="main"></main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+</script>
+<script src="../formulas/iol-constants.js"></script>
+<script src="../formulas/iol-formulas.js"></script>
+<script src="parse.js"></script>
+<script src="ocr.js"></script>
+<script src="official-fill.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
