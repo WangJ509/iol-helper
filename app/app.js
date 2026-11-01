@@ -51,7 +51,10 @@
   window.addEventListener('resize', () => document.documentElement.style.setProperty('--header-h', $('#top').offsetHeight + 'px'));
   $('#steps').addEventListener('click', e => { const b = e.target.closest('button[data-step]'); if (b && !b.disabled) go(b.dataset.step); });
   $('#resetBtn').addEventListener('click', () => { if (confirm('清除目前所有資料並開新個案？')) { S = fresh(); go('eye'); } });
-  window.addEventListener('beforeunload', e => { if (S.docs.length) { e.preventDefault(); e.returnValue = ''; } });
+  // iOS 主畫面 web app（standalone）裡開外站會進到 App 內瀏覽器，沒有 Safari 分享選單，捷徑無法執行
+  const standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  let toSafari = false;
+  window.addEventListener('beforeunload', e => { if (S.docs.length && !toSafari) { e.preventDefault(); e.returnValue = ''; } });
 
   function go(step) { S.step = step; render(); window.scrollTo(0, 0); }
   function render() {
@@ -658,6 +661,7 @@
                 <li>第一次使用前：到 iPhone「設定 › App › 捷徑 › 進階」（iOS 17 以前為「設定 › 捷徑 › 進階」），開啟「允許執行腳本」。</li>
                 <li>在小幫手按「複製資料並開啟官網」，到官網頁面按 Safari 的「分享」，選「IOL小幫手填入」。</li>
                 <li>第一次在每個官網執行時，捷徑會詢問是否允許存取該網站，選「允許」。</li></ol>
+              <div class="small muted">從主畫面的小幫手 App 使用時，按「複製資料並開啟官網」會自動切到 Safari 開官網（需 iOS 17 以上），小幫手留在背景，資料不會消失。</div>
               <div class="small muted">捷徑內含填入程式；小幫手更新填入功能後需重新下載安裝。</div></details>
             <details class="m-help"><summary>手機或平板無法拖曳？（書籤做法）</summary>
               <ol><li>按 <button class="btn sm" id="bmCopy" type="button">複製書籤程式碼</button></li>
@@ -693,6 +697,15 @@
     if (t.dataset.copy) {
       const site = OFFICIAL[t.dataset.copy];
       const data = payload(S.officialKSet);
+      if (standalone) {
+        // 先複製再用 x-safari- 網址交給 Safari（iOS 17+），小幫手留在背景、資料不會消失
+        const ok = await copyText(JSON.stringify(data));
+        $('#copyMsg').innerHTML = ok
+          ? `<div class="msg ok">已複製 ${S.eye}（${data.kSet}）資料，正在用 Safari 開啟 ${esc(site.name)}。到官網按「分享」選「IOL小幫手填入」。沒有跳到 Safari 時，請按 <a href="${esc(site.url)}" target="_blank" rel="noopener">這個連結</a> 後選「在 Safari 中打開」。</div>`
+          : '<div class="msg bad">無法寫入剪貼簿，請確認瀏覽器權限。</div>';
+        if (ok) { toSafari = true; location.href = 'x-safari-' + site.url; setTimeout(() => { toSafari = false; }, 1500); }
+        return;
+      }
       const win = window.open(site.url, '_blank', 'noopener');
       const ok = await copyText(JSON.stringify(data));
       $('#copyMsg').innerHTML = ok
