@@ -59,6 +59,14 @@ IOL_OCR_CMD="python3 /opt/iol/paddle_ocr.py" python3 server/server.py
 <script>window.IOL_OCR_CONFIG = { workerPath: 'vendor/worker.min.js', corePath: 'vendor/', langPath: 'vendor/' };</script>
 ```
 
+## iPhone 捷徑
+
+`app/IOL小幫手填入.shortcut` 是從 Safari 分享選單執行的捷徑：讀剪貼簿 → 在官網頁面執行與書籤相同的填入程式 → 顯示摘要。修改 `app/official-fill.js` 後，要在 Mac 上重新產生並簽署（需 macOS 12+、登入 iCloud）：
+
+```bash
+python3 tools/build-shortcut.py
+```
+
 ## 測試
 
 ```bash

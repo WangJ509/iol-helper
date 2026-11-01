@@ -19,7 +19,7 @@ import tempfile
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
 MOUNTS = {"/formulas/": ROOT / "formulas", "/": ROOT / "app"}
@@ -49,7 +49,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def translate_path(self, path):
-        clean = urlparse(path).path
+        clean = unquote(urlparse(path).path)
         for prefix, base in MOUNTS.items():
             if clean.startswith(prefix):
                 rel = clean[len(prefix):] or "index.html"

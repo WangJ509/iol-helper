@@ -2,18 +2,20 @@
  * 官網一鍵填入（書籤小程式）
  * 使用者在自己的瀏覽器開官網 → 點書籤 → 讀取剪貼簿中核對完成的資料 → 填入欄位並標示。
  * 不按 Calculate、不接受條款、不處理驗證碼；填完列出成功與未填欄位，由使用者核對後自行計算。
- * 此函式會被 toString() 轉成 javascript: 書籤，因此必須完全自足、不可引用外部變數。
+ * 此函式會被 toString() 轉成 javascript: 書籤與 iPhone 捷徑，因此必須完全自足、不可引用外部變數。
+ * preset：捷徑直接傳入的資料（JSON 字串或物件）；書籤不傳，改讀剪貼簿。回傳一行摘要給捷徑顯示。
  */
-window.IOL_FILL_MAIN = async function () {
+window.IOL_FILL_MAIN = async function (preset) {
   'use strict';
   const PANEL_ID = '__iol_fill_panel';
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const fmt = v => (v === null || v === undefined || v === '' ? null : String(v));
 
   async function readPayload() {
-    let text = '';
-    try { text = await navigator.clipboard.readText(); } catch (e) { text = ''; }
-    if (!/"iolHelper"/.test(text)) text = window.prompt('請貼上 IOL 核對小幫手複製的資料（Cmd/Ctrl+V）：') || '';
+    if (preset && typeof preset === 'object') return preset.iolHelper === 1 ? preset : null;
+    let text = typeof preset === 'string' ? preset : '';
+    if (!text) { try { text = await navigator.clipboard.readText(); } catch (e) { text = ''; } }
+    if (!/"iolHelper"/.test(text) && preset === undefined) text = window.prompt('請貼上 IOL 核對小幫手複製的資料（Cmd/Ctrl+V）：') || '';
     try {
       const d = JSON.parse(text);
       if (d.iolHelper !== 1) throw new Error();
@@ -46,7 +48,7 @@ window.IOL_FILL_MAIN = async function () {
   function apacrsKIndex(d) {
     const want = d.kIndex === 1.332 ? '332' : '337.5';
     const r = [...document.querySelectorAll('input[name$="RadioButtonList1"]')].find(x => x.value === want);
-    if (r && !r.checked) { notes.push(`網站 K index 與資料（${d.kIndex}）不同，請先手動切換 K index（切換會重新載入頁面），再點一次書籤。`); return false; }
+    if (r && !r.checked) { notes.push(`網站 K index 與資料（${d.kIndex}）不同，請先手動切換 K index（切換會重新載入頁面），再執行一次書籤或捷徑。`); return false; }
     return true;
   }
   function personalConstant(d) {
@@ -132,7 +134,7 @@ window.IOL_FILL_MAIN = async function () {
     else { document.body.click(); missing.push(label + '（選項不符，請手動選擇）'); }
   }
   async function fillEscrs(d) {
-    if (/I AGREE/.test(document.body.innerText) && !escrsSection(d.eye)) { notes.push('請先閱讀並自行按「I AGREE」接受使用條款，再點一次書籤。'); return; }
+    if (/I AGREE/.test(document.body.innerText) && !escrsSection(d.eye)) { notes.push('請先閱讀並自行按「I AGREE」接受使用條款，再執行一次書籤或捷徑。'); return; }
     const sec = escrsSection(d.eye);
     if (!sec) { missing.push(d.eye + ' 區塊（找不到）'); return; }
     const top = document;
@@ -211,7 +213,7 @@ window.IOL_FILL_MAIN = async function () {
     const old = document.getElementById(PANEL_ID); if (old) old.remove();
     const box = document.createElement('div');
     box.id = PANEL_ID;
-    box.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;width:340px;max-height:80vh;overflow:auto;background:#fff;color:#1c2330;border:2px solid #ff8a00;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);font:14px/1.5 -apple-system,"PingFang TC","Noto Sans TC",sans-serif;padding:12px';
+    box.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;width:min(340px,calc(100vw - 24px));max-height:80vh;overflow:auto;background:#fff;color:#1c2330;border:2px solid #ff8a00;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);font:14px/1.5 -apple-system,"PingFang TC","Noto Sans TC",sans-serif;padding:12px';
     const eyeColor = d && d.eye === 'OS' ? '#1849a9' : '#b42318';
     const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
     box.innerHTML = `
@@ -232,9 +234,9 @@ window.IOL_FILL_MAIN = async function () {
     : host === 'calc.apacrs.org' && path.includes('toric') ? 'Barrett Toric'
     : host === 'iolcalculator.escrs.org' ? 'ESCRS'
     : host === 'iolcalc.ascrs.org' ? 'ASCRS 屈光術後' : null;
-  if (!site) { alert('IOL 小幫手：請在 ESCRS、APACRS（Barrett／Toric）或 ASCRS 計算器頁面使用此書籤。'); return; }
+  if (!site) { const m = 'IOL 小幫手：請在 ESCRS、APACRS（Barrett／Toric）或 ASCRS 計算器頁面使用。'; if (preset === undefined) alert(m); return m; }
   const d = await readPayload();
-  if (!d) { notes.push('沒有讀到 IOL 小幫手的資料。請回小幫手按「複製資料」後再點書籤。'); panel(null, site); return; }
+  if (!d) { notes.push('沒有讀到 IOL 小幫手的資料。請回小幫手按「複製資料」後再執行一次。'); panel(null, site); return notes[0]; }
   if (d.expiresAt && Date.now() > d.expiresAt) notes.push('這份資料已超過 2 小時，請確認是目前的個案。');
   try {
     if (site === 'Barrett Universal II') fillBarrett(d);
@@ -246,4 +248,5 @@ window.IOL_FILL_MAIN = async function () {
   // 回讀：確認網站沒有改寫數值
   done.forEach(x => { if (x.el.type !== 'checkbox' && x.el.type !== 'radio' && x.el.tagName !== 'SELECT' && String(x.el.value).replace(/\.0+$/, '') !== String(x.value).replace(/\.0+$/, '') && Number(x.el.value) !== Number(x.value)) notes.push(`「${x.label}」回讀為 ${x.el.value}，與資料 ${x.value} 不同，請確認。`); });
   panel(d, site);
+  return `${site}｜${d.eye}｜已填 ${done.length} 欄${missing.length ? `，未填 ${missing.length} 項` : ''}${notes.length ? `，提醒 ${notes.length} 則` : ''}。請在頁面上核對後自行按 Calculate。`;
 };

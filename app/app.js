@@ -653,7 +653,13 @@
       <div class="card"><h2>官方網站：一鍵填入</h2>
         <ol class="small">
           <li>第一次使用：把這個按鈕拖曳到瀏覽器書籤列 → <a class="bm" id="bmLink" href="#">IOL 小幫手填入</a>（只需安裝一次）
-            <details class="m-help"><summary>手機或平板無法拖曳？</summary>
+            <details class="m-help"><summary>iPhone：用捷徑填入（建議）</summary>
+              <ol><li>安裝捷徑：<a href="IOL%E5%B0%8F%E5%B9%AB%E6%89%8B%E5%A1%AB%E5%85%A5.shortcut" download>下載「IOL小幫手填入」捷徑</a>，在 Safari 下載項目點開，選「加入捷徑」。</li>
+                <li>第一次使用前：到 iPhone「設定 › App › 捷徑 › 進階」（iOS 17 以前為「設定 › 捷徑 › 進階」），開啟「允許執行腳本」。</li>
+                <li>在小幫手按「複製資料並開啟官網」，到官網頁面按 Safari 的「分享」，選「IOL小幫手填入」。</li>
+                <li>第一次在每個官網執行時，捷徑會詢問是否允許存取該網站，選「允許」。</li></ol>
+              <div class="small muted">捷徑內含填入程式；小幫手更新填入功能後需重新下載安裝。</div></details>
+            <details class="m-help"><summary>手機或平板無法拖曳？（書籤做法）</summary>
               <ol><li>按 <button class="btn sm" id="bmCopy" type="button">複製書籤程式碼</button></li>
                 <li>把目前這頁加入書籤（Safari：分享 › 加入書籤；Chrome：⋮ › ☆）。</li>
                 <li>編輯那個書籤：名稱改成「IOL 小幫手填入」，網址整段刪掉，貼上剛才複製的內容後儲存。</li>
