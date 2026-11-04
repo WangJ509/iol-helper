@@ -27,9 +27,9 @@
     items: {},             // 已選定的值（只限手術眼）
     active: null,          // 目前定位 {docId, tokens}
     viewDoc: null, zoom: 1, viewerCollapsed: false,
-    history: { type: '', myopic: 'myopic', tnp: null, tnpDate: '', preK1: null, preK2: null, lvcSE: null, ccp: null, note: '', checked: false },
-    lens: { idx: '', A: null, alSource: 'optical', confirmUnclear: false, checked: false },
-    plan: { target: 0, SIA: 0, incision: 0, age: null, gender: '', checked: false },
+    history: { type: '', myopic: 'myopic', tnp: null, tnpDate: '', preK1: null, preK2: null, lvcSE: null, ccp: null, note: '' },
+    lens: { idx: '', A: null, alSource: 'optical', confirmUnclear: false },
+    plan: { target: 0, SIA: 0, incision: 0, age: null, gender: '' },
     escrsConstants: false, officialKSet: 'A',
   });
   let S = fresh();
@@ -85,7 +85,7 @@
     if (eyeBtn) {
       const eye = eyeBtn.dataset.eye;
       if (S.eye && S.eye !== eye && Object.keys(S.items).length && !confirm('更換手術眼會清除已核對的項目，確定？')) return;
-      if (S.eye !== eye) { S.items = {}; S.lens.checked = false; S.history.checked = false; S.plan.checked = false; }
+      if (S.eye !== eye) S.items = {};
       S.eye = eye; render();
     }
     if (e.target.id === 'toUpload') go('upload');
@@ -267,8 +267,7 @@
   function progress() {
     if (!S.eye) return { done: 0, total: 0 };
     const items = Object.values(S.items).filter(it => isRequired(it) || isNum(it.value));
-    const extra = [S.history.checked, S.lens.checked, S.plan.checked];
-    return { done: items.filter(i => i.checked).length + extra.filter(Boolean).length, total: items.length + extra.length };
+    return { done: items.filter(i => i.checked).length, total: items.length };
   }
 
   function pairK(pair) {
@@ -415,7 +414,7 @@
   function historyHtml() {
     const h = S.history, post = isPostRefractive();
     const missingTnp = post && !isNum(h.tnp);
-    return `<div class="sec ${h.checked ? 'checked' : ''}"><h3>屈光手術史</h3>
+    return `<div class="sec"><h3>屈光手術史</h3>
       <div class="grid2"><label class="f">手術史<select data-h="type">${['<option value="">— 請選擇 —</option>'].concat(HISTORY.map(([v, t]) => `<option value="${v}" ${h.type === v ? 'selected' : ''}>${t}</option>`)).join('')}</select></label>
       ${['LASIK', 'PRK', 'SMILE'].includes(h.type) ? `<label class="f">矯正類型<select data-h="myopic"><option value="myopic" ${h.myopic === 'myopic' ? 'selected' : ''}>近視</option><option value="hyperopic" ${h.myopic === 'hyperopic' ? 'selected' : ''}>遠視</option></select></label>` : ''}</div>
       ${post ? `<div class="grid2" style="margin-top:8px">
@@ -425,8 +424,7 @@
         <label class="f">術前 K1（選填）<input type="number" step="0.01" data-h="preK1" value="${h.preK1 ?? ''}"></label>
         <label class="f">術前 K2（選填）<input type="number" step="0.01" data-h="preK2" value="${h.preK2 ?? ''}"></label>
         <label class="f">Atlas 中央角膜度數（選填）<input type="number" step="0.01" data-h="ccp" value="${h.ccp ?? ''}"></label></div>
-        ${missingTnp ? '<div class="msg warn small">屈光術後需輸入 Pentacam TNP_Apex_4.0 mm Zone。</div>' : ''}` : ''}
-      <label class="row small" style="margin-top:8px"><input type="checkbox" class="big-check" data-hcheck ${h.checked ? 'checked' : ''} ${!h.type || missingTnp ? 'disabled' : ''}>已向病人／病歷確認手術史</label></div>`;
+        ${missingTnp ? '<div class="msg warn small">屈光術後需輸入 Pentacam TNP_Apex_4.0 mm Zone。</div>' : ''}` : ''}</div>`;
   }
 
   function lensHtml() {
@@ -440,8 +438,7 @@
     if (c && isNum(L.A) && tableVal != null && L.A !== tableVal) msgs.push(`目前使用 ${L.A}，與常數表 ${tableVal} 不同，請確認依據。`);
     const ascanDoc = S.docs.some(d => d.device === 'A-scan' && d.id === (S.items['bio:AL'] || {}).docId);
     if (ascanDoc && L.alSource !== 'ascan') msgs.push('眼軸來源報告標記為 A-scan，請確認是否應改用 A-scan 常數。');
-    const canCheck = c && isNum(L.A) && (c.status !== 'unclear' || L.confirmUnclear);
-    return `<div class="sec ${L.checked ? 'checked' : ''}"><h3>鏡片與常數</h3>
+    return `<div class="sec"><h3>鏡片與常數</h3>
       <div class="grid2">
         <label class="f" style="grid-column:1/-1">鏡片（IOL constant.pdf）<select data-l="idx"><option value="">— 請選擇 —</option>
           ${IOL_CONSTANTS.map((k, i) => `<option value="${i}" ${String(L.idx) === String(i) ? 'selected' : ''} ${k.status === 'excluded' ? 'disabled' : ''}>${esc(k.maker)} ${esc(k.model)}（A-scan ${k.ascan ?? '缺'}／SRK/T ${k.srkt ?? '缺'}）${k.status === 'excluded' ? '－停用' : ''}</option>`).join('')}</select></label>
@@ -449,21 +446,19 @@
         <label class="f">使用的 A 常數<input type="number" step="0.01" data-l="A" value="${L.A ?? ''}"></label>
       </div>
       ${msgs.map(m => `<div class="msg warn small">${esc(m)}</div>`).join('')}
-      ${c && c.status === 'unclear' ? `<label class="row small"><input type="checkbox" data-l="confirmUnclear" ${L.confirmUnclear ? 'checked' : ''}>我已向原始資料確認此常數</label>` : ''}
-      <label class="row small" style="margin-top:6px"><input type="checkbox" class="big-check" data-lcheck ${L.checked ? 'checked' : ''} ${canCheck ? '' : 'disabled'}>已核對鏡片與常數</label></div>`;
+      ${c && c.status === 'unclear' ? `<label class="row small"><input type="checkbox" data-l="confirmUnclear" ${L.confirmUnclear ? 'checked' : ''}>我已向原始資料確認此常數</label>` : ''}</div>`;
   }
 
   function planHtml() {
     const P = S.plan;
-    return `<div class="sec ${P.checked ? 'checked' : ''}"><h3>計算設定</h3>
+    return `<div class="sec"><h3>計算設定</h3>
       <div class="grid2">
         <label class="f">目標屈光 (D)<input type="number" step="0.25" data-p="target" value="${P.target ?? ''}"></label>
         <label class="f">SIA (D)<input type="number" step="0.05" data-p="SIA" value="${P.SIA ?? ''}"></label>
         <label class="f">切口位置 (°)<input type="number" step="1" data-p="incision" value="${P.incision ?? ''}"></label>
         <label class="f">年齡（ESCRS 必填）<input type="number" step="1" data-p="age" value="${P.age ?? ''}"></label>
         <label class="f">性別（ESCRS 必填）<select data-p="gender"><option value="">—</option><option value="M" ${P.gender === 'M' ? 'selected' : ''}>男</option><option value="F" ${P.gender === 'F' ? 'selected' : ''}>女</option></select></label>
-      </div>
-      <label class="row small" style="margin-top:6px"><input type="checkbox" class="big-check" data-pcheck ${P.checked ? 'checked' : ''} ${isNum(P.target) ? '' : 'disabled'}>已核對計算設定</label></div>`;
+      </div></div>`;
   }
 
   // 核對頁事件
@@ -491,9 +486,8 @@
     }
     if (t.dataset.h !== undefined) {
       const k = t.dataset.h; S.history[k] = ['tnp', 'preK1', 'preK2', 'lvcSE', 'ccp'].includes(k) ? toNum(t.value) : t.value;
-      S.history.checked = false; rerenderChecklist();
+      rerenderChecklist();
     }
-    if (t.dataset.hcheck !== undefined) { S.history.checked = t.checked; rerenderChecklist(); }
     if (t.dataset.l !== undefined) {
       const k = t.dataset.l;
       if (k === 'confirmUnclear') S.lens.confirmUnclear = t.checked;
@@ -504,11 +498,9 @@
         S.lens.A = c ? c[S.lens.alSource === 'ascan' ? 'ascan' : 'srkt'] : null;   // 連動常數表，缺值保持空白
         S.lens.confirmUnclear = false;
       }
-      S.lens.checked = false; rerenderChecklist();
+      rerenderChecklist();
     }
-    if (t.dataset.lcheck !== undefined) { S.lens.checked = t.checked; rerenderChecklist(); }
-    if (t.dataset.p !== undefined) { const k = t.dataset.p; S.plan[k] = k === 'gender' ? t.value : toNum(t.value); S.plan.checked = false; rerenderChecklist(); }
-    if (t.dataset.pcheck !== undefined) { S.plan.checked = t.checked; rerenderChecklist(); }
+    if (t.dataset.p !== undefined) { const k = t.dataset.p; S.plan[k] = k === 'gender' ? t.value : toNum(t.value); rerenderChecklist(); }
   });
   document.addEventListener('click', e => {
     const t = e.target;
@@ -627,7 +619,10 @@
     const out = [];
     const need = ['bio:AL', 'bio:ACD', 'bio:K1', 'bio:K2'].concat(S.officialKSet === 'B' ? ['ar:K1', 'ar:K2'] : []);
     need.forEach(k => { const it = S.items[k]; if (!it || !it.checked) out.push(k.startsWith('ar:') ? 'auto ' + k.slice(3) : k.slice(4)); });
-    if (!S.history.checked) out.push('屈光手術史'); if (!S.lens.checked) out.push('鏡片與常數'); if (!S.plan.checked) out.push('計算設定');
+    if (isPostRefractive() && !isNum(S.history.tnp)) out.push('Pentacam TNP_Apex_4.0 mm');
+    const c = IOL_CONSTANTS[S.lens.idx];
+    if (!c || !isNum(S.lens.A)) out.push('鏡片與 A 常數'); else if (c.status === 'unclear' && !S.lens.confirmUnclear) out.push('確認鏡片常數');
+    if (!isNum(S.plan.target)) out.push('目標屈光');
     return out;
   }
   function optionalUnverified() {
@@ -718,7 +713,7 @@
     const others = Object.keys(OFFICIAL).filter(k => !sites.includes(k));
     const siteCard = k => `<div class="card"><h3>${OFFICIAL[k].name}</h3><div class="small muted">${OFFICIAL[k].group}${k === 'ascrs' ? '｜欄位對應尚未實測' : ''}</div>
       <div class="row" style="margin-top:8px"><button class="btn primary sm" data-copy="${k}" ${miss.length ? 'disabled' : ''}>複製資料並開啟官網</button></div></div>`;
-    return `${miss.length ? `<div class="msg warn">必要項目尚未核對：${esc(miss.join('、'))}。核對後才能複製資料到官網。</div>` : '<div class="msg ok">必要項目已核對，可以複製到官網。</div>'}
+    return `${miss.length ? `<div class="msg warn">必要項目尚未完成：${esc(miss.join('、'))}。完成後才能複製資料到官網。</div>` : '<div class="msg ok">必要項目已完成，可以複製到官網。</div>'}
       ${optMiss.length ? `<div class="msg info small">選填欄位未核對：${esc(optMiss.join('、'))}。這些數值不會送到官網；若要使用，請回上一步核對。</div>` : ''}
       ${alerts().map(a => `<div class="msg ${a.cls}">${esc(a.text)}</div>`).join('')}
       <div class="card"><h2>平台內建公式（公開公式，非官網結果）</h2>
