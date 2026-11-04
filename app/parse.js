@@ -254,7 +254,7 @@
   // 只讀到 OD 或 OS 一邊，但同一欄名在同一列重複出現 → 其實是左右分欄，另一眼的標示被 OCR 漏掉
   function twinColumns(tokens, layout) {
     if (layout.mode !== 'page' || layout.forced) return layout;
-    const labs = tokens.map(t => { const l = bioLabelOf(tokens, t); return l && l.tokens[0] === t ? { field: l.field, t } : null; }).filter(Boolean);
+    const labs = tokens.map(t => { const l = bioLabelOf(tokens, t); return l && l.tokens[0] === t && l.field !== 'LT' ? { field: l.field, t } : null; }).filter(Boolean);   // 度數表的 Lens 同一眼也會並排
     const rights = [];
     labs.forEach(a => labs.forEach(b => { if (a.field === b.field && a.t.cx < b.t.cx && sameRow(a.t, b.t)) rights.push(b.t.x0); }));
     if (rights.length < 2) return layout;
@@ -282,11 +282,14 @@
       c.conf = confs.length ? Math.min.apply(null, confs) : 0;
       if (c.value == null) c.issues.push('找到欄名但沒有配對到數值');
       else {
-        // OCR 漏小數點（4400D）：還原後一定標成需確認，由人工對照原圖
-        if (c.value > field.max && c.value >= 1000 && Number.isInteger(c.value) && c.value / 100 >= field.min && c.value / 100 <= field.max) {
-          c.value /= 100;
+        // OCR 漏小數點（4400D、330mm）：還原後一定標成需確認，由人工對照原圖
+        const div = c.value > field.max && Number.isInteger(c.value) ? [100, 10].find(n => c.value / n >= field.min && c.value / n <= field.max) : null;
+        if (div) {
+          c.value /= div;
           c.issues.push(`影像讀到「${c.raw}」，疑似漏小數點，暫列為 ${c.value}，請對照原圖`);
         }
+        // 模糊時 D 常讀成 0：44.25D → 44.250
+        if (!c.unit && field.unit === 'D' && /^\d+\.\d\d0$/.test(c.raw)) c.unit = 'D';
         if (c.value < field.min || c.value > field.max) c.issues.push(`數值超出合理範圍 ${field.min}–${field.max}`);
         if (!c.unit) c.issues.push(`未讀到單位（預期 ${field.unit}）`);
         else if (c.unit !== field.unit) c.issues.push(`單位為 ${c.unit}，預期 ${field.unit}`);

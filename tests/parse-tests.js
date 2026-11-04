@@ -260,6 +260,21 @@ function iolmasterWords() {
   check('還原後仍不合理 → 不改動', one(bad, 'OD', 'K1').value === 9000);
 })();
 
+/* 16. 模糊報告：ACD 漏小數點、D 讀成 0、度數表 Lens 並排不影響左右分欄；數值為虛構 */
+(() => {
+  const col = (x, acd, k) => [['AXL', x + 300, 300], ['24.10mm', x + 420, 300], ['ACD', x + 300, 360], [acd, x + 420, 360], ['K1', x + 20, 1300], [k, x + 90, 1300],
+    ['Lens', x + 60, 1400], ['118.0', x + 190, 1400], ['Lens', x + 500, 1400], ['118.4', x + 620, 1400]];
+  const w = [['OD', 120, 300]].concat(col(0, '330mm', '44.250'), col(1000, '4.74mm', '44.250'));
+  const r = P.parseBiometry(page(2000, 2600, w, 0));
+  check('模糊：分欄線在左右眼之間，不落在度數表', r.layout.mode === 'columns' && r.layout.split > 0.45 && r.layout.split < 0.52, String(r.layout.split));
+  const a = one(r, 'OD', 'ACD');
+  check('模糊：330mm → 3.3 並標需確認', a.value === 3.3 && a.status === 'check' && a.issues.some(x => x.includes('330mm')), a.issues.join('；'));
+  const k = one(r, 'OD', 'K1');
+  check('模糊：44.250 視為 44.25 D，不報缺單位', k.value === 44.25 && k.unit === 'D' && !k.issues.some(x => x.includes('單位')), k.issues.join('；'));
+  const w2 = P.parseBiometry(page(1400, 900, [['OD', 150, 80], ['WTW', 80, 180], ['118', 220, 180], ['mm', 300, 180]], 0));
+  check('模糊：WTW 118 → 11.8', one(w2, 'OD', 'WTW').value === 11.8);
+})();
+
 var fails = out.filter(s => s.indexOf('FAIL') === 0).length;
 out.push('\n共 ' + out.length + ' 項，失敗 ' + fails + ' 項');
 if (print) print(out.join('\n')); else out.join('\n');
