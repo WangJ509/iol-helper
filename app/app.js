@@ -30,7 +30,7 @@
     history: { type: '', myopic: 'myopic', tnp: null, tnpDate: '', preK1: null, preK2: null, lvcSE: null, ccp: null, note: '' },
     lens: { idx: '', A: null, alSource: 'optical', confirmUnclear: false },
     plan: { target: 0, SIA: 0, incision: 0, age: null, gender: '' },
-    escrsConstants: false, officialKSet: 'A',
+    escrsConstants: false, kActive: null, setStore: {},
   });
   let S = fresh();
 
@@ -85,7 +85,7 @@
     if (eyeBtn) {
       const eye = eyeBtn.dataset.eye;
       if (S.eye && S.eye !== eye && Object.keys(S.items).length && !confirm('更換手術眼會清除已核對的項目，確定？')) return;
-      if (S.eye !== eye) S.items = {};
+      if (S.eye !== eye) resetItems();
       S.eye = eye; render();
     }
     if (e.target.id === 'toUpload') go('upload');
@@ -169,7 +169,7 @@
     } catch (err) {
       temp.status = 'error'; temp.error = err.message || String(err);
     }
-    S.items = {};   // 新資料進來，重新建立核對清單
+    resetItems();   // 新資料進來，重新建立核對清單
     if (S.step === 'upload') render();
   }
   function parseDoc(d) {
@@ -182,7 +182,7 @@
     const inp = e.target.closest('input[type=file][data-kind]');
     if (inp) { addFiles(Array.from(inp.files), inp.dataset.kind); inp.value = ''; }
     const df = e.target.closest('[data-docfield]');
-    if (df) { const d = S.docs.find(x => x.id === df.dataset.doc); if (d) { d[df.dataset.docfield] = df.value; S.items = {}; } }
+    if (df) { const d = S.docs.find(x => x.id === df.dataset.doc); if (d) { d[df.dataset.docfield] = df.value; resetItems(); } }
   });
   document.addEventListener('dragover', e => { const z = e.target.closest('.drop'); if (z) { e.preventDefault(); z.classList.add('over'); } });
   document.addEventListener('dragleave', e => { const z = e.target.closest('.drop'); if (z) z.classList.remove('over'); });
@@ -195,8 +195,8 @@
   document.addEventListener('click', e => {
     const t = e.target;
     if (t.id === 'toVerify') go('verify');
-    if (t.dataset.force) { const d = S.docs.find(x => x.id === t.dataset.doc); d.forceEye = t.dataset.force; parseDoc(d); S.items = {}; render(); }
-    if (t.dataset.remove) { S.docs = S.docs.filter(x => x.id !== t.dataset.remove); S.items = {}; render(); }
+    if (t.dataset.force) { const d = S.docs.find(x => x.id === t.dataset.doc); d.forceEye = t.dataset.force; parseDoc(d); resetItems(); render(); }
+    if (t.dataset.remove) { S.docs = S.docs.filter(x => x.id !== t.dataset.remove); resetItems(); render(); }
     if (t.dataset.rotate || t.dataset.psm) {
       const d = S.docs.find(x => x.id === (t.dataset.rotate || t.dataset.psm));
       const siblings = S.docs.filter(x => x.file === d.file).map(x => x.id);
@@ -224,9 +224,23 @@
     const [a, b] = pair.map(k => S.items[k]);
     return a && b ? IOLParse.pairSets(a.cands, b.cands) : [];
   }
+  function resetItems() { S.items = {}; S.setStore = {}; }
+  // 每張單子的 K 各自保存修改與核對狀態，切換組別不會互相覆蓋
+  function saveSet(pair) {
+    pair.forEach(k => {
+      const { candId, docId, value, axis, unit, manual, checked } = S.items[k];
+      if (docId) S.setStore[k + '@' + docId] = { candId, docId, value, axis, unit, manual, checked };
+    });
+  }
   function choosePair(pair, set) {
-    [[pair[0], set.a], [pair[1], set.b]].forEach(([k, side]) => Object.assign(S.items[k], { checked: false },
-      side.pick ? fromCand(side.pick) : { candId: null, docId: set.docId, value: null, axis: null, unit: null, manual: false }));
+    saveSet(pair);
+    [[pair[0], set.a], [pair[1], set.b]].forEach(([k, side]) => Object.assign(S.items[k], S.setStore[k + '@' + set.docId] ||
+      Object.assign({ checked: false }, side.pick ? fromCand(side.pick) : { candId: null, docId: set.docId, value: null, axis: null, unit: null, manual: false })));
+  }
+  function setField(key, set, side) {
+    const it = S.items[key];
+    if (it.docId === set.docId) return it;
+    return S.setStore[key + '@' + set.docId] || (side.pick ? { value: side.pick.c.value, axis: side.pick.c.axis, checked: false } : { value: null, axis: null, checked: false });
   }
   function buildItems() {
     const fresh = [];
@@ -297,7 +311,7 @@
     if (k && (k.K1 + k.K2) / 2 < 40) out.push({ cls: 'warn', text: `平均 K ${p2((k.K1 + k.K2) / 2)} D（< 40 D）：請確認是否有 LASIK／PRK／RK 等屈光手術史。` });
     [['生物測量', PAIRS.K], ['Auto 單', PAIRS.AR]].forEach(([n, p]) => {
       const sets = setsFor(p);
-      if (sets.length > 1 && !S.items[p[0]].docId) out.push({ cls: 'warn', text: `${n}有 ${sets.length} 張單子的 K 不同，請選擇採用哪一組；K1、K2 必須來自同一張。` });
+      if (sets.length > 1 && !S.items[p[0]].docId) out.push({ cls: 'warn', text: `${n}有 ${sets.length} 張單子的 K，請點選一組核對；K1、K2 必須來自同一張，每組都可以分別計算。` });
     });
     const cmp = kCompare();
     if (cmp && cmp.any) out.push({ cls: 'bad', text: '生物測量與 auto 單的 K 值差異大，請確認量測品質（見下方比較）。' });
@@ -374,28 +388,33 @@
       <div class="src">${d ? `來源：${esc(docLabel(d))}｜${esc(d.device || '儀器未填')}｜報告日期 ${esc(d.date || '未確認')}｜${esc(d.engine)}` : it.manual ? '來源：人工輸入' : ''}</div>
     </div>`;
   }
-  // 一組完整且數值合理才計算；OCR 漏小數點（4250）這類讀值只顯示、不納入比較
-  function setK(s) {
-    if (!s.complete) return null;
-    const { min, max } = IOLParse.BIO_FIELDS.K1, k = { K1: s.a.pick.c.value, K1axis: s.a.pick.c.axis, K2: s.b.pick.c.value, K2axis: s.b.pick.c.axis };
-    return [k.K1, k.K2].every(v => v >= min && v <= max) ? k : null;
+  // 一組完整且數值合理才計算；OCR 漏小數點（4250）這類讀值要先修正
+  function setK(pair, set) {
+    const a = setField(pair[0], set, set.a), b = setField(pair[1], set, set.b);
+    const { min, max } = IOLParse.BIO_FIELDS.K1;
+    if (![a.value, b.value].every(v => isNum(v) && v >= min && v <= max)) return null;
+    return { K1: a.value, K1axis: a.axis, K2: b.value, K2axis: b.axis, checked: !!(a.checked && b.checked) };
   }
   function setsHtml(name, label) {
     const pair = PAIRS[name], sets = setsFor(pair);
     if (sets.length < 2) return '';
     const chosen = S.items[pair[0]].docId;
-    const base = sets.find(s => s.docId === chosen && setK(s)) || sets.find(setK);
-    const val = (side, f) => `${f} ${side.pick ? `${side.pick.c.value}${side.pick.c.axis != null ? ' @' + side.pick.c.axis + '°' : ''}${side.pick.c.status === 'ok' ? '' : ' <span class="kdiff">需確認</span>'}` : side.ambiguous ? '多個數值' : '未找到'}`;
+    const base = sets.find(s => s.docId === chosen && setK(pair, s)) || sets.find(s => setK(pair, s));
+    const val = (key, s, side, f) => {
+      const x = setField(key, s, side);
+      if (isNum(x.value)) return `${f} ${x.value}${x.axis != null ? ' @' + x.axis + '°' : ''}${!x.manual && side.pick && side.pick.c.status !== 'ok' ? ' <span class="kdiff">需確認</span>' : ''}`;
+      return `${f} ${side.ambiguous ? '多個數值' : '未找到'}`;
+    };
     const row = s => {
-      const k = setK(s), p = k && kPolar(k), c = k && base && s !== base ? kCompare(setK(base), k) : null;
+      const k = setK(pair, s), p = k && kPolar(k), c = k && base && s !== base ? kCompare(setK(pair, base), k) : null;
       return `<label class="kset ${s.docId === chosen ? 'on' : ''}"><input type="radio" name="set-${name}" data-set="${name}" value="${s.docId}" ${s.docId === chosen ? 'checked' : ''}>
-        <span><b>${esc(docLabel(s.d))}</b> <span class="muted">${esc(s.d.date || '日期未確認')}</span><br>
-        ${val(s.a, label + '1')}　${val(s.b, label + '2')}
+        <span><b>${esc(docLabel(s.d))}</b> <span class="muted">${esc(s.d.date || '日期未確認')}</span> ${k && k.checked ? '<span class="state ok">已核對</span>' : '<span class="state check">未核對</span>'}<br>
+        ${val(pair[0], s, s.a, label + '1')}　${val(pair[1], s, s.b, label + '2')}
         ${p ? `<br><span class="muted">平均 ${p2(p.mean)}｜散光 ${p2(p.cyl)}</span>` : ''}
         ${c ? `<br><span class="${c.any ? 'kdiff' : 'muted'}">與基準組差：平均 ${s2(c.b.mean - c.a.mean)}｜散光 ${s2(c.b.cyl - c.a.cyl)}${c.dAx == null ? '' : `｜陡軸 ${c.dAx}°`}</span>` : ''}
-        ${k && s === base && sets.length > 1 ? '<br><span class="muted small">基準組</span>' : ''}</span></label>`;
+        ${k && s === base ? '<br><span class="muted small">基準組</span>' : ''}</span></label>`;
     };
-    return `<div class="ksets"><div class="small"><b>${label} 組別</b>（${sets.length} 張單子，${label}1、${label}2 一定取自同一張，可比較但不混用）</div>${sets.map(row).join('')}</div>`;
+    return `<div class="ksets" data-kname="${name}"><div class="small"><b>${label} 組別</b>（${sets.length} 張單子，${label}1、${label}2 一定取自同一張；點選一組後在下方核對）</div>${sets.map(row).join('')}</div>`;
   }
   function docLabel(d) { return `${d.fileName}${d.pageCount > 1 ? ` p${d.page}` : ''}`; }
 
@@ -537,6 +556,9 @@
     el.classList.toggle('checked', it.checked);
     const badge = el.querySelector('.state'); badge.className = 'state ' + st.cls; badge.textContent = st.text;
     const cb = el.querySelector('[data-check]'); cb.disabled = st.cls === 'miss'; cb.checked = it.checked;
+    const name = Object.keys(PAIRS).find(n => PAIRS[n].includes(it.key));
+    const box = name && $(`.ksets[data-kname="${name}"]`);
+    if (box) box.outerHTML = setsHtml(name, name === 'TK' ? 'TK' : 'K');
     const al = alerts();
     // 提醒與比較可能改變：只更新這些區塊
     const cl = $('#checklist');
@@ -617,8 +639,9 @@
   // 複製到官網前必須核對的項目；選填欄位未核對時可複製，但不送出
   function requiredUnverified() {
     const out = [];
-    const need = ['bio:AL', 'bio:ACD', 'bio:K1', 'bio:K2'].concat(S.officialKSet === 'B' ? ['ar:K1', 'ar:K2'] : []);
-    need.forEach(k => { const it = S.items[k]; if (!it || !it.checked) out.push(k.startsWith('ar:') ? 'auto ' + k.slice(3) : k.slice(4)); });
+    ['bio:AL', 'bio:ACD'].forEach(k => { const it = S.items[k]; if (!it || !it.checked) out.push(k.slice(4)); });
+    const act = activeSet();
+    if (!act) out.push('K1、K2'); else if (!act.checked) out.push(`${act.label} 的 K1、K2`);
     if (isPostRefractive() && !isNum(S.history.tnp)) out.push('Pentacam TNP_Apex_4.0 mm');
     const c = IOL_CONSTANTS[S.lens.idx];
     if (!c || !isNum(S.lens.A)) out.push('鏡片與 A 常數'); else if (c.status === 'unclear' && !S.lens.confirmUnclear) out.push('確認鏡片常數');
@@ -628,11 +651,11 @@
   function optionalUnverified() {
     return Object.values(S.items).filter(it => it.src === 'bio' && !REQUIRED.includes(it.field) && isNum(it.value) && !it.checked).map(it => it.field);
   }
-  function payload(kset) {
-    const k = kset === 'B' ? autoK() : bioK();
+  function payload() {
+    const act = activeSet(), k = act && act.k;
     const c = IOL_CONSTANTS[S.lens.idx];
     return {
-      iolHelper: 1, createdAt: Date.now(), expiresAt: Date.now() + 2 * 3600 * 1000, kSet: kset === 'B' ? 'auto refraction K' : '生物測量 K',
+      iolHelper: 1, createdAt: Date.now(), expiresAt: Date.now() + 2 * 3600 * 1000, kSet: act ? act.label : '',
       eye: S.eye, caseCode: S.caseCode || undefined,
       AL: checkedValue('AL'), ACD: checkedValue('ACD'), LT: checkedValue('LT'), WTW: checkedValue('WTW'), CCT: checkedValue('CCT'),
       K1: k ? k.K1 : null, K1axis: k ? k.K1axis : null, K2: k ? k.K2 : null, K2axis: k ? k.K2axis : null, kIndex: 1.3375,
@@ -657,34 +680,50 @@
       .map(([n, mk]) => { try { const f = mk(); return { n, f, P: f.power(S.plan.target || 0), table: IOLFormulas.powerTable(f, S.plan.target || 0, 0.5) }; } catch (e) { return { n, err: e.message }; } });
   }
 
-  // 每張單子的 K 各算一次，只比較不混用；AL、ACD 用核對頁選定的同一組
-  function kSetsCompareHtml() {
-    const groups = [['生物測量', PAIRS.K], ['Auto 單', PAIRS.AR]];
-    if (!groups.some(([, p]) => setsFor(p).length > 1)) return '';
-    const rows = groups.flatMap(([n, p]) => setsFor(p).filter(setK).map(s => {
-      const k = setK(s);
-      const pol = kPolar(k), res = formulaSet(k);
-      return `<div class="kset ${S.items[p[0]].docId === s.docId ? 'on' : ''}"><span><b>${n}｜${esc(docLabel(s.d))}</b> <span class="muted">${esc(s.d.date || '日期未確認')}</span>${S.items[p[0]].docId === s.docId ? ' <span class="state ok">採用</span>' : ''}<br>
-        K1 ${p2(k.K1)}　K2 ${p2(k.K2)}<span class="muted">｜平均 ${p2(pol.mean)}｜散光 ${p2(pol.cyl)}</span><br>
-        ${res.map(x => (x.err ? `${x.n} —` : `${x.n} <b>${p2(x.P)}</b>`)).join('　')}</span></div>`;
-    }));
-    return rows.length ? `<div class="card"><h2>各組 K 比較</h2><p class="small muted">每張單子的 K 各自計算，只作比較。這裡是辨識到的原始值，未核對的組別請勿直接採用。</p>${rows.join('')}</div>` : '';
+  // 每張單子的 K 都是一組：可分別跑後續計算，AL、ACD 等沿用核對頁同一份
+  function kSetList() {
+    const out = [];
+    [['K', '生物測量'], ['AR', 'Auto 單']].forEach(([name, n]) => {
+      const pair = PAIRS[name];
+      if (!S.items[pair[0]]) return;
+      setsFor(pair).forEach(s => {
+        const k = setK(pair, s);
+        if (k) out.push({ id: `${name}:${s.docId}`, label: `${s.d.device || n}｜${docLabel(s.d)}`, date: s.d.date, k, checked: k.checked });
+      });
+      const typed = !S.items[pair[0]].docId && pairK(pair);
+      if (typed) out.push({ id: `${name}:manual`, label: `${n}｜人工輸入`, date: '', k: typed, checked: S.items[pair[0]].checked && S.items[pair[1]].checked });
+    });
+    return out;
   }
-  function pairSource(pair) {
-    const d = S.docs.find(x => x.id === S.items[pair[0]]?.docId);
-    return d ? `：${esc(docLabel(d))}` : '';
+  function activeSet() {
+    const list = kSetList();
+    return list.find(x => x.id === S.kActive) || list.find(x => x.checked) || list[0] || null;
+  }
+  function kSetsHtml() {
+    const list = kSetList(), act = activeSet();
+    if (!list.length) return '';
+    const base = formulaSet(act.k);
+    const rows = list.map(x => {
+      const on = x.id === act.id, pol = kPolar(x.k), res = formulaSet(x.k);
+      const axis = v => (v != null ? ' @' + v + '°' : '');
+      return `<label class="kset ${on ? 'on' : ''}"><input type="radio" name="kset" value="${esc(x.id)}" ${on ? 'checked' : ''} data-kset>
+        <span><b>${esc(x.label)}</b> <span class="muted">${esc(x.date || '日期未確認')}</span> ${x.checked ? '<span class="state ok">已核對</span>' : '<span class="state check">未核對</span>'}<br>
+        K1 ${p2(x.k.K1)}${axis(x.k.K1axis)}　K2 ${p2(x.k.K2)}${axis(x.k.K2axis)}<span class="muted">｜平均 ${p2(pol.mean)}｜散光 ${p2(pol.cyl)}</span><br>
+        ${res.map((r, i) => (r.err ? `${r.n} —` : `${r.n} <b>${p2(r.P)}</b>${!on && base[i] && !base[i].err ? ` <span class="muted">(${s2(r.P - base[i].P)})</span>` : ''}`)).join('　')}</span></label>`;
+    });
+    return `<div class="card"><h2>K 組</h2><p class="small muted">每張單子的 K1、K2 是一組。選哪一組，下方公式、Toric、屈光術後與官網填入就用哪一組；AL、ACD 等其他數值沿用核對頁。括號為與目前選定組的度數差。</p>${rows.join('')}</div>`;
   }
 
   function viewCalc() {
     const miss = requiredUnverified();
     const optMiss = optionalUnverified();
-    const A = formulaSet(bioK()), B = formulaSet(autoK());
-    const cards = A ? A.map((x, i) => x.err ? `<div class="fcard"><h3>${x.n}</h3><div class="small muted">${esc(x.err)}</div></div>` :
-      `<div class="fcard"><h3>${x.n}</h3><div class="big">${p2(x.P)} D</div><div class="small muted">生物測量 K｜ELP ${p2(x.f.ELP)} mm</div>
-        ${B && B[i] && !B[i].err ? `<div class="small">auto K：<b>${p2(B[i].P)} D</b>（差 ${s2(B[i].P - x.P)}）</div>` : ''}
+    buildItems();
+    const act = activeSet(), bk = act && act.k;
+    const A = formulaSet(bk);
+    const cards = A ? A.map(x => x.err ? `<div class="fcard"><h3>${x.n}</h3><div class="small muted">${esc(x.err)}</div></div>` :
+      `<div class="fcard"><h3>${x.n}</h3><div class="big">${p2(x.P)} D</div><div class="small muted">${esc(act.label)}｜ELP ${p2(x.f.ELP)} mm</div>
         <table class="t">${x.table.rows.map(r => `<tr><td>${p2(r.power)}</td><td>${s2(r.refraction)}</td></tr>`).join('')}</table></div>`).join('') : '<p class="muted">缺少 K1／K2，無法計算。</p>';
     let toric = '';
-    const bk = bioK();
     if (bk && (isToric() || Math.abs(bk.K2 - bk.K1) >= 1)) {
       try {
         const plan = IOLFormulas.toricPlan(Object.assign({ AL: valueOf('AL'), A: S.lens.A, SIA: S.plan.SIA, incisionAxis: S.plan.incision,
@@ -716,10 +755,10 @@
     return `${miss.length ? `<div class="msg warn">必要項目尚未完成：${esc(miss.join('、'))}。完成後才能複製資料到官網。</div>` : '<div class="msg ok">必要項目已完成，可以複製到官網。</div>'}
       ${optMiss.length ? `<div class="msg info small">選填欄位未核對：${esc(optMiss.join('、'))}。這些數值不會送到官網；若要使用，請回上一步核對。</div>` : ''}
       ${alerts().map(a => `<div class="msg ${a.cls}">${esc(a.text)}</div>`).join('')}
+      ${kSetsHtml()}
       <div class="card"><h2>平台內建公式（公開公式，非官網結果）</h2>
-        <p class="small muted">A 常數 ${S.lens.A ?? '—'}（${S.lens.alSource === 'ascan' ? 'A-scan 欄' : 'SRK/T 欄'}）｜目標 ${s2(S.plan.target)} D${B ? '｜同時列出以 auto 單 K 計算的度數' : ''}</p>
+        <p class="small muted">A 常數 ${S.lens.A ?? '—'}（${S.lens.alSource === 'ascan' ? 'A-scan 欄' : 'SRK/T 欄'}）｜目標 ${s2(S.plan.target)} D${act ? `｜K：${esc(act.label)}` : ''}</p>
         <div class="cards">${cards}</div></div>
-      ${kSetsCompareHtml()}
       ${toric}${post}
       <div class="card"><h2>官方網站：一鍵填入</h2>
         <ol class="small">
@@ -741,8 +780,7 @@
           <li>核對後由你自己按 Calculate。網站的使用條款、驗證碼請自行處理。</li>
         </ol>
         <div class="row small">
-          <label class="row"><input type="radio" name="kset" value="A" ${S.officialKSet === 'A' ? 'checked' : ''} data-kset>使用生物測量 K${pairSource(PAIRS.K)}</label>
-          <label class="row"><input type="radio" name="kset" value="B" ${S.officialKSet === 'B' ? 'checked' : ''} ${autoK() ? '' : 'disabled'} data-kset>使用 auto 單 K${pairSource(PAIRS.AR)}（再算一次比較）</label>
+          <span class="row">送到官網的 K：<b>${act ? esc(act.label) : '尚未有完整的 K 組'}</b></span>
           <label class="row"><input type="checkbox" data-escrsc ${S.escrsConstants ? 'checked' : ''}>ESCRS 各公式常數也填入同一 A 常數（預設不填，由網站依鏡片帶入）</label>
         </div>
         <h3 style="margin-top:10px">本個案建議</h3><div class="official">${sites.map(siteCard).join('')}</div>
@@ -764,7 +802,7 @@
     if (t.id === 'bmCopy') { const ok = await copyText(bookmarkletHref()); t.textContent = ok ? '已複製' : '複製失敗'; }
     if (t.dataset.copy) {
       const site = OFFICIAL[t.dataset.copy];
-      const data = payload(S.officialKSet);
+      const data = payload();
       if (standalone) {
         // 先複製再用 x-safari- 網址交給 Safari（iOS 17+），小幫手留在背景、資料不會消失
         const ok = await copyText(JSON.stringify(data));
@@ -783,6 +821,7 @@
     if (t.id === 'exportBtn') {
       const rec = { exportedAt: new Date().toISOString(), eye: S.eye, caseCode: S.caseCode,
         docs: S.docs.filter(d => d.status === 'done').map(d => ({ file: d.fileName, page: d.page, kind: d.kind, device: d.device, date: d.date, engine: d.engine, uploadedAt: d.uploadedAt })),
+        kSets: kSetList().map(x => ({ label: x.label, date: x.date, K1: x.k.K1, K1axis: x.k.K1axis, K2: x.k.K2, K2axis: x.k.K2axis, checked: x.checked, used: x.id === (activeSet() || {}).id })),
         items: Object.values(S.items).map(it => ({ field: (it.src === 'ar' ? 'auto ' : '') + it.field, value: it.value, axis: it.axis, checked: it.checked, manual: it.manual,
           source: (S.docs.find(d => d.id === it.docId) || {}).fileName || null })),
         history: S.history, lens: Object.assign({}, S.lens, { name: (IOL_CONSTANTS[S.lens.idx] || {}).model }), plan: S.plan };
@@ -792,7 +831,7 @@
     }
   });
   document.addEventListener('change', e => {
-    if (e.target.dataset.kset !== undefined) { S.officialKSet = e.target.value; if (S.step === 'calc') render(); }
+    if (e.target.dataset.kset !== undefined) { S.kActive = e.target.value; if (S.step === 'calc') render(); }
     if (e.target.dataset.escrsc !== undefined) S.escrsConstants = e.target.checked;
   });
 
