@@ -39,8 +39,8 @@
   // 只用來「停止往右找」的其他欄名，不產生候選
   const STOP_LABELS = /^(SE|TSE|SD|SNR|VCD|VITREOUS|AVE|AVG|R1|R2|CYL|P|FIX|K|TK|R|R:|n|SPH|AX|AXIS|S|C|A|Q|PUPIL|P:)$/;
 
-  const OD_RE = /^(OD|O\.D\.?|RIGHT|<R>?|\(R\)|\[R\]|右眼?)$/;
-  const OS_RE = /^(OS|O\.S\.?|LEFT|<L>?|\(L\)|\[L\]|左眼?)$/;
+  const OD_RE = /^(OD|0D|O\.D\.?|RIGHT|<R>?|\(R\)|\[R\]|右眼?)$/;
+  const OS_RE = /^(OS|0S|O\.S\.?|LEFT|<L>?|\(L\)|\[L\]|左眼?)$/;
   const UNIT_RE = /^(mm|D|dpt|µm|μm|um)$/i;
   const NUM_RE = /^[-+−]?\d+(?:[.,]\d+)?$/;
 
@@ -110,7 +110,7 @@
     if (os.length && !od.length) return { mode: 'page', eye: 'OS', markers: os.slice(0, 1) };
     if (!od.length && !os.length) return { mode: 'unknown', markers: [] };
     // 優先順序：<R>／<L>（auto 單分區）> OD／OS 文字 > 其他（例如眼壓區的 [R]）；同級取最大字、再取最上方
-    const rank = t => { const k = labelKey(t.t); return /^</.test(k) ? 3 : /^(OD|OS|RIGHT|LEFT)/.test(k) ? 2 : 1; };
+    const rank = t => { const k = labelKey(t.t); return /^</.test(k) ? 3 : /^(OD|OS|0D|0S|RIGHT|LEFT)/.test(k) ? 2 : 1; };
     const pick = arr => arr.slice().sort((a, b) => (rank(b) - rank(a)) || (b.h - a.h) || (a.cy - b.cy))[0];
     const a = pick(od), b = pick(os);
     const dx = Math.abs(a.cx - b.cx), dy = Math.abs(a.cy - b.cy);
@@ -174,6 +174,7 @@
     const all = tokens.map(t => t.t).join(' ').toUpperCase();
     if (/IOL ?MASTER/.test(all)) return 'IOLMaster';
     if (/LENSTAR/.test(all)) return 'Lenstar';
+    if (/SONOMED|ESCALON/.test(all)) return 'A-scan';
     if (/ARGOS/.test(all)) return 'Argos';
     if (/A-?SCAN|ULTRASOUND|VELOCITY/.test(all)) return 'A-scan';
     if (/AUTO ?REF|KERATO|REF\/KER|\bREF\b/.test(all)) return 'Auto refraction';
@@ -272,6 +273,8 @@
       const field = BIO_FIELDS[lab.field];
       const eye = eyeOf(t, layout);
       const v = valueAfter(tokens, lab, field, o => eyeOf(o, layout) === eye);
+      // Sonomed 等 A-scan 的度數表也寫「Lens 118.0」，那是 A 常數，不是水晶體厚度
+      if (lab.field === 'LT' && v && v.value > 20) return;
       const c = { kind: 'bio', field: lab.field, eye, label: lab.tokens.map(x => x.t).join(' '),
         value: v ? v.value : null, raw: v ? v.raw : null, unit: v ? normUnit(v.unit) : null, axis: v ? v.axis : null,
         tokens: lab.tokens.concat(v ? v.tokens : []), where: v ? v.where : null, issues: [] };
@@ -279,6 +282,11 @@
       c.conf = confs.length ? Math.min.apply(null, confs) : 0;
       if (c.value == null) c.issues.push('找到欄名但沒有配對到數值');
       else {
+        // OCR 漏小數點（4400D）：還原後一定標成需確認，由人工對照原圖
+        if (c.value > field.max && c.value >= 1000 && Number.isInteger(c.value) && c.value / 100 >= field.min && c.value / 100 <= field.max) {
+          c.value /= 100;
+          c.issues.push(`影像讀到「${c.raw}」，疑似漏小數點，暫列為 ${c.value}，請對照原圖`);
+        }
         if (c.value < field.min || c.value > field.max) c.issues.push(`數值超出合理範圍 ${field.min}–${field.max}`);
         if (!c.unit) c.issues.push(`未讀到單位（預期 ${field.unit}）`);
         else if (c.unit !== field.unit) c.issues.push(`單位為 ${c.unit}，預期 ${field.unit}`);

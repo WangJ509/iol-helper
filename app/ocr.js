@@ -8,6 +8,7 @@
 (function (root) {
   'use strict';
   const MAX_SIDE = 3000;
+  const MIN_SIDE = 2600, MAX_UPSCALE = 4;
   let workerPromise = null;
   let serverOcr = null;
 
@@ -36,10 +37,27 @@
     });
   }
 
-  // 將任一來源畫到畫布：套用旋轉、限制尺寸（瀏覽器已依 EXIF 轉正照片）
-  function toCanvas(source, w, h, quarterTurns) {
+  // 截圖常帶大片黑邊：找出非黑區域，避免報告只佔畫面一小部分
+  function contentBox(source, w, h) {
+    const n = 400, sc = Math.min(1, n / Math.max(w, h)), sw = Math.max(1, Math.round(w * sc)), sh = Math.max(1, Math.round(h * sc));
+    const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+    const ctx = c.getContext('2d'); ctx.drawImage(source, 0, 0, sw, sh);
+    const px = ctx.getImageData(0, 0, sw, sh).data;
+    const dark = (i0, step, count) => { let bright = 0; for (let j = 0; j < count; j++) { const i = (i0 + j * step) * 4; if (px[i] + px[i + 1] + px[i + 2] > 150) bright++; } return bright < count * 0.02; };
+    let x0 = 0, x1 = sw, y0 = 0, y1 = sh;
+    while (x0 < x1 - 1 && dark(x0, sw, sh)) x0++;
+    while (x1 - 1 > x0 && dark(x1 - 1, sw, sh)) x1--;
+    while (y0 < y1 - 1 && dark(y0 * sw, 1, sw)) y0++;
+    while (y1 - 1 > y0 && dark((y1 - 1) * sw, 1, sw)) y1--;
+    return { x: x0 / sc, y: y0 / sc, w: (x1 - x0) / sc, h: (y1 - y0) / sc };
+  }
+
+  // 將任一來源畫到畫布：套用旋轉、限制尺寸（瀏覽器已依 EXIF 轉正照片）；小圖放大，OCR 才認得出小字
+  function toCanvas(source, w, h, quarterTurns, crop) {
     const k = ((quarterTurns || 0) % 4 + 4) % 4;
-    const scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+    const b = crop || { x: 0, y: 0, w, h };
+    w = b.w; h = b.h;
+    const scale = Math.min(MAX_UPSCALE, Math.max(1, MIN_SIDE / Math.max(w, h)), MAX_SIDE / Math.max(w, h));
     const sw = Math.round(w * scale), sh = Math.round(h * scale);
     const c = document.createElement('canvas');
     c.width = k % 2 ? sh : sw; c.height = k % 2 ? sw : sh;
@@ -47,7 +65,8 @@
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
     ctx.translate(c.width / 2, c.height / 2);
     ctx.rotate(k * Math.PI / 2);
-    ctx.drawImage(source, -sw / 2, -sh / 2, sw, sh);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(source, b.x, b.y, b.w, b.h, -sw / 2, -sh / 2, sw, sh);
     return c;
   }
 
@@ -83,7 +102,8 @@
     const url = URL.createObjectURL(file);
     try {
       const img = await loadImage(url);
-      return [toCanvas(img, img.naturalWidth, img.naturalHeight, quarterTurns)];
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+      return [toCanvas(img, iw, ih, quarterTurns, contentBox(img, iw, ih))];
     } finally { URL.revokeObjectURL(url); }
   }
 

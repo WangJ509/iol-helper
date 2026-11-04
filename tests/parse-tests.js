@@ -233,6 +233,33 @@ function iolmasterWords() {
   check('真的只有單眼的報告仍為整頁', single.layout.mode === 'page');
 })();
 
+/* 14. Sonomed Escalon A-scan：AXL、K 無軸向、度數表的 Lens 是 A 常數；數值為虛構 */
+(() => {
+  const col = (x, ax, k1, k2) => [['AXL', x + 90, 190], [ax, x + 150, 190], ['mm', x + 220, 190], ['ACD', x + 90, 205], ['3.20', x + 130, 205], ['mm', x + 170, 205],
+    ['Lens', x + 90, 220], ['0.00', x + 130, 220], ['mm', x + 170, 220], ['Vitreous', x + 75, 235], ['22.00', x + 130, 235], ['mm', x + 170, 235],
+    ['K1', x + 5, 430], [k1, x + 25, 430], ['D', x + 65, 430], ['K2', x + 75, 430], [k2, x + 95, 430], ['D', x + 135, 430],
+    ['Lens', x + 25, 452], ['118.0', x + 60, 452], ['Lens', x + 170, 452], ['118.4', x + 205, 452], ['Lens', x + 25, 615], ['118.7', x + 60, 615]];
+  const w = [['SonomedEscalon', 80, 40], ['Report', 20, 97], ['Date', 60, 97], ['Oct', 170, 97], ['15,', 195, 97], ['2025', 220, 97], ['OD', 30, 188], ['OS', 330, 188]]
+    .concat(col(20, '24.10', '43.00', '44.00'), col(320, '24.60', '44.50', '45.00'));
+  const r = P.parseBiometry(page(1860, 2415, w.map(([t, x, y]) => [t, x * 3, y * 3]), 0));
+  check('Sonomed：判定左右分欄、儀器 A-scan', r.layout.mode === 'columns' && r.device === 'A-scan', r.layout.mode + ' ' + r.device);
+  check('Sonomed：AXL → AL', one(r, 'OD', 'AL') && one(r, 'OD', 'AL').value === 24.1 && one(r, 'OS', 'AL').value === 24.6);
+  check('Sonomed：K1、K2 不互相吃到', one(r, 'OD', 'K1').value === 43 && one(r, 'OD', 'K2').value === 44 && one(r, 'OS', 'K2').value === 45);
+  check('Sonomed：度數表 Lens 118 不算 LT', get(r, 'OD', 'LT').length === 1 && one(r, 'OD', 'LT').value === 0, get(r, 'OD', 'LT').map(c => c.value).join(','));
+  check('Sonomed：日期', r.dates.some(d => d.iso === '2025-10-15'), r.dates.map(d => d.raw).join(','));
+})();
+
+/* 15. OCR 漏小數點、OS 讀成 0S */
+(() => {
+  const w = [['OD', 150, 80], ['0S', 850, 80], ['K1:', 80, 180], ['4400D', 220, 180], ['K1:', 780, 180], ['43.25', 920, 180], ['D', 1040, 180]];
+  const r = P.parseBiometry(page(1400, 900, w, 0));
+  check('0S 視為 OS，左右分欄', r.layout.mode === 'columns' && !r.layout.inferredFrom);
+  const c = one(r, 'OD', 'K1');
+  check('4400D → 暫列 44，標需確認並保留原文', c.value === 44 && c.status === 'check' && c.issues.some(x => x.includes('4400D')), c.issues.join('；'));
+  const bad = P.parseBiometry(page(1400, 900, [['OD', 150, 80], ['K1:', 80, 180], ['9000', 220, 180], ['D', 340, 180]], 0));
+  check('還原後仍不合理 → 不改動', one(bad, 'OD', 'K1').value === 9000);
+})();
+
 var fails = out.filter(s => s.indexOf('FAIL') === 0).length;
 out.push('\n共 ' + out.length + ' 項，失敗 ' + fails + ' 項');
 if (print) print(out.join('\n')); else out.join('\n');
