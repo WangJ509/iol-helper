@@ -110,6 +110,11 @@ input[type=text], input[type=number], input[type=date], select, textarea {
 .src { font-size: 12px; color: var(--muted); }
 .cands { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .cands label { border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; font-size: 13px; display: flex; gap: 4px; align-items: center; }
+.ksets { border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.kset { display: flex; gap: 8px; align-items: flex-start; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-top: 6px; font-size: 13.5px; }
+.kset.on { border-color: var(--accent); background: var(--soft); }
+.kset input { flex: none; margin-top: 3px; }
+.kdiff { color: var(--bad); font-weight: 600; }
 .state { font-size: 12px; padding: 0 7px; border-radius: 9px; }
 .state.ok { background: var(--ok-bg); color: var(--ok); }
 .state.check { background: var(--warn-bg); color: var(--warn); }
@@ -166,6 +171,8 @@ td.flag { color: var(--bad); font-weight: 700; }
   label.row { flex-wrap: nowrap; align-items: flex-start; gap: 8px; }
   label.row > input { flex: none; margin-top: 4px; }
   .viewer { height: 36vh; }
+  .viewer-bar { flex-wrap: nowrap; overflow-x: auto; }
+  .viewer-bar > * { flex: none; }
   .viewer.collapsed { height: auto; }
   .viewer.collapsed .viewer-scroll, .viewer.collapsed #viewerSrc, .viewer.collapsed [data-zoom], .viewer.collapsed #zoomTxt { display: none; }
   .ov.hl { border-width: 1.5px; margin: -1px; padding: 1px; box-shadow: none; }

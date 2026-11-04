@@ -200,6 +200,39 @@ function iolmasterWords() {
   check('單據：日期 0CT/15/2025 → 2025-10-15', r.dates[0] && r.dates[0].iso === '2025-10-15', r.dates.map(d => d.raw).join(','));
 })();
 
+/* 12. K1、K2 以單張報告為一組，不跨單混用 */
+(() => {
+  const e = (doc, value, axis) => ({ c: { value, axis }, d: { id: doc } });
+  let s = P.pairSets([e('A', 43.25, 10), e('B', 43.5, 12)], [e('A', 44.75, 100), e('B', 44.5, 102)]);
+  check('兩張單子 → 兩組，各自成對', s.length === 2 && s[0].a.pick.c.value === 43.25 && s[0].b.pick.c.value === 44.75 && s[1].a.pick.c.value === 43.5 && s[1].b.pick.c.value === 44.5);
+  check('兩張數值不同 → 不預選', P.defaultSet(s) === null);
+  s = P.pairSets([e('A', 43.25, 10), e('B', 43.25, 10)], [e('A', 44.75, 100), e('B', 44.5, 100)]);
+  check('K1 相同、K2 不同 → 仍不預選（不可只鎖 K1）', P.defaultSet(s) === null);
+  s = P.pairSets([e('A', 43.25, 10), e('B', 43.25, 10)], [e('A', 44.75, 100), e('B', 44.75, 100)]);
+  check('兩張完全相同 → 預選同一張', P.defaultSet(s).docId === 'A' && s[0].complete);
+  s = P.pairSets([e('A', 43.25, 10), e('B', 43.5, 12)], [e('B', 44.5, 102)]);
+  check('A 缺 K2 → 不完整，不借用 B 的 K2', !s[0].complete && s[0].b.pick === null && s[1].complete);
+  check('一張完整、一張不完整 → 不預選', P.defaultSet(s) === null);
+  s = P.pairSets([e('A', 43.25, 10)], [e('A', 44.75, 100), e('A', 44.25, 95)]);
+  check('同一張有兩個 K2 → 標記多值，不挑選', s[0].b.ambiguous && s[0].b.pick === null && !s[0].complete);
+  check('只有一張 → 預選該張（即使不完整）', P.defaultSet(s).docId === 'A');
+})();
+
+/* 13. OCR 漏掉 OS 標示：左右分欄不可整頁算成 OD */
+(() => {
+  const w = [['OD', 150, 80], ['AL:', 80, 180], ['23.45', 220, 180], ['mm', 340, 180], ['AL:', 780, 180], ['23.50', 920, 180], ['mm', 1040, 180],
+    ['K1:', 80, 500], ['43.25', 220, 500], ['D', 340, 500], ['@', 370, 500], ['10°', 400, 500],
+    ['K1:', 780, 500], ['43.30', 920, 500], ['D', 1040, 500], ['@', 1070, 500], ['170°', 1100, 500]];
+  const r = P.parseBiometry(page(1400, 900, w, 0));
+  check('漏 OS 標示 → 改判左右分欄', r.layout.mode === 'columns', r.layout.mode);
+  check('左欄仍為 OD，且只有一個 K1', get(r, 'OD', 'K1').length === 1 && one(r, 'OD', 'K1').value === 43.25);
+  check('右欄不算 OD，推定 OS 並標記需確認', one(r, 'OS', 'K1').value === 43.3 && one(r, 'OS', 'K1').status === 'check');
+  const f = P.parseBiometry(page(1400, 900, w, 0), { forceEye: 'OD' });
+  check('人工指定整頁眼別時不改判', f.layout.mode === 'page');
+  const single = P.parseBiometry(page(1400, 900, [['OD', 150, 80], ['AL:', 80, 180], ['23.45', 220, 180], ['mm', 340, 180], ['K1:', 80, 260], ['43.25', 220, 260], ['D', 340, 260], ['@', 370, 260], ['10°', 400, 260]], 0));
+  check('真的只有單眼的報告仍為整頁', single.layout.mode === 'page');
+})();
+
 var fails = out.filter(s => s.indexOf('FAIL') === 0).length;
 out.push('\n共 ' + out.length + ' 項，失敗 ' + fails + ' 項');
 if (print) print(out.join('\n')); else out.join('\n');

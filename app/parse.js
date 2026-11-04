@@ -250,10 +250,21 @@
     return k;
   }
 
+  // 只讀到 OD 或 OS 一邊，但同一欄名在同一列重複出現 → 其實是左右分欄，另一眼的標示被 OCR 漏掉
+  function twinColumns(tokens, layout) {
+    if (layout.mode !== 'page' || layout.forced) return layout;
+    const labs = tokens.map(t => { const l = bioLabelOf(tokens, t); return l && l.tokens[0] === t ? { field: l.field, t } : null; }).filter(Boolean);
+    const rights = [];
+    labs.forEach(a => labs.forEach(b => { if (a.field === b.field && a.t.cx < b.t.cx && sameRow(a.t, b.t)) rights.push(b.t.x0); }));
+    if (rights.length < 2) return layout;
+    const m = layout.markers[0], split = Math.min.apply(null, rights) - m.h * 0.2;
+    return { mode: 'columns', split, odLeft: (m.cx < split) === (layout.eye === 'OD'), top: m.y0 - m.h * 0.5, markers: [m], inferredFrom: layout.eye };
+  }
+
   function parseBiometry(boxes, opts) {
     const o = opts || {};
     const tokens = explode(boxes);
-    const layout = o.forceEye ? { mode: 'page', eye: o.forceEye, markers: [], forced: true } : detectEyeLayout(tokens);
+    const layout = o.forceEye ? { mode: 'page', eye: o.forceEye, markers: [], forced: true } : twinColumns(tokens, detectEyeLayout(tokens));
     const cands = [];
     tokens.forEach(t => {
       const lab = bioLabelOf(tokens, t);
@@ -277,6 +288,7 @@
         if (c.where === 'below') c.issues.push('數值取自欄名下方，請確認對應');
       }
       if (!eye) c.issues.push('無法判定眼別');
+      else if (layout.inferredFrom && eye !== layout.inferredFrom) c.issues.push('沒有讀到此眼標示，依左右分欄推定眼別');
       cands.push(c);
     });
     return finish({ kind: 'biometry', tokens, layout, cands, dates: detectDates(tokens), device: detectDevice(tokens) });
@@ -355,5 +367,26 @@
     return words;
   }
 
-  return { BIO_FIELDS, parseBiometry, parseAutoref, explode, detectEyeLayout, detectDates, fromTesseract, labelKey, parseNum };
+  /* 成對欄位（K1＋K2、TK1＋TK2）以單張報告為一組，不跨單混用。list 項目為 {c, d}，d.id 為單張 */
+  function pairSets(listA, listB) {
+    const ids = [];
+    listA.concat(listB).forEach(x => { if (!ids.includes(x.d.id)) ids.push(x.d.id); });
+    const side = (list, id) => {
+      const mine = list.filter(x => x.d.id === id && x.c.value != null);
+      const vals = new Set(mine.map(x => `${x.c.value}|${x.c.axis}`));
+      return { pick: vals.size === 1 ? mine[0] : null, ambiguous: vals.size > 1 };
+    };
+    return ids.map(id => {
+      const a = side(listA, id), b = side(listB, id);
+      return { docId: id, d: listA.concat(listB).find(x => x.d.id === id).d, a, b, complete: !!(a.pick && b.pick) };
+    });
+  }
+  // 只有一張單子，或每張的數值完全相同時才預選；其餘由使用者選，不猜
+  function defaultSet(sets) {
+    if (sets.length === 1) return sets[0];
+    const key = s => [s.a, s.b].map(x => `${x.pick.c.value}|${x.pick.c.axis}`).join('/');
+    return sets.length && sets.every(s => s.complete) && new Set(sets.map(key)).size === 1 ? sets[0] : null;
+  }
+
+  return { BIO_FIELDS, parseBiometry, parseAutoref, explode, detectEyeLayout, detectDates, fromTesseract, labelKey, parseNum, pairSets, defaultSet };
 });

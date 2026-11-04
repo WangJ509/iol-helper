@@ -76,6 +76,7 @@ node formulas/formula-tests.js    # 或 Mac：osascript -l JavaScript formulas/f
 
 ## 限制
 
+- K1／K2、TK1／TK2 以單張報告為一組，不同單子只比較、不混用；AL、ACD 等其他欄位仍是逐欄選擇來源。
 - OCR 與配對結果只是候選值，必須逐項人工核對；版型不同、模糊、斜拍都可能配對失敗或漏字。
 - 平台內建公式只有公開發表的公式；Barrett、Kane、EVO、Hill-RBF 等請以官網為準。
 - ASCRS 計算器的欄位對應是依欄名比對，尚未在官網實測。
