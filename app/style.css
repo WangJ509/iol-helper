@@ -182,3 +182,12 @@ td.flag { color: var(--bad); font-weight: 700; }
   table.t th, table.t td { padding: 4px 3px; font-size: 13px; }
   .official, .cards { grid-template-columns: 1fr; }
 }
+
+/* 遠端來源各自回報，表格在手機可水平捲動。 */
+.remote-cards { margin:12px 0; align-items:stretch; }
+.remote-cards .f { display:flex; flex-direction:column; margin:8px 0; }
+.remote-cards select { width:100%; min-width:0; }
+.remote-table { overflow-x:auto; margin-top:16px; }
+.remote-table table { min-width:540px; }
+.remote-table caption { text-align:left; padding:8px 0; font-weight:600; }
+.remote-error { color:#a32323; }

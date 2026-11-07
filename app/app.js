@@ -22,7 +22,7 @@
   };
 
   const fresh = () => ({
-    step: 'eye', eye: null, caseCode: '',
+    step: 'eye', eye: null, caseCode: '', remoteCaseKey: Date.now() + ':' + Math.random(),
     docs: [],              // 每頁影像一筆
     items: {},             // 已選定的值（只限手術眼）
     active: null,          // 目前定位 {docId, tokens}
@@ -33,6 +33,7 @@
     escrsConstants: false, kActive: null, setStore: {},
   });
   let S = fresh();
+  const remote = IOLRemote.create(() => remoteContext(), () => { if (S.step === 'calc') render(); });
 
   /* ---------- 頂部 ---------- */
   function renderTop() {
@@ -483,6 +484,7 @@
   // 核對頁事件
   document.addEventListener('input', e => {
     const t = e.target;
+    if (t.dataset.remote === 'constant') { remote.change(t, false); return; }
     if (t.dataset.item) {
       const it = S.items[t.dataset.item];
       it[t.dataset.k] = toNum(t.value);
@@ -666,6 +668,14 @@
       escrsConstants: S.escrsConstants,
     };
   }
+  function remoteContext() {
+    const blockers = [];
+    const missing = requiredUnverified();
+    if (missing.length) blockers.push('請先完成必要核對：' + missing.join('、'));
+    if (S.history.type !== 'none') blockers.push('遠端查詢目前僅支援已確認無角膜屈光手術的標準 SE');
+    if (S.lens.alSource !== 'optical') blockers.push('目前遠端查詢只支援光學生物測量，A-scan 請使用官網');
+    return { data: payload(), history: S.history.type, caseKey: S.remoteCaseKey, blockers };
+  }
   function bookmarkletHref() {
     // 去掉縮排與整行註解以縮短書籤（保留換行，避免改變語意）
     const src = window.IOL_FILL_MAIN.toString().split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('//')).join('\n');
@@ -759,6 +769,7 @@
       <div class="card"><h2>平台內建公式（公開公式，非官網結果）</h2>
         <p class="small muted">A 常數 ${S.lens.A ?? '—'}（${S.lens.alSource === 'ascan' ? 'A-scan 欄' : 'SRK/T 欄'}）｜目標 ${s2(S.plan.target)} D${act ? `｜K：${esc(act.label)}` : ''}</p>
         <div class="cards">${cards}</div></div>
+      ${remote.render(remoteContext())}
       ${toric}${post}
       <div class="card"><h2>官方網站：一鍵填入</h2>
         <ol class="small">
@@ -798,6 +809,8 @@
   }
   document.addEventListener('click', async e => {
     const t = e.target;
+    const remoteButton = t.closest('[data-remote-query]');
+    if (remoteButton && !remoteButton.disabled) remote.query(remoteButton.dataset.remoteQuery);
     if (t.id === 'bmLink') { e.preventDefault(); alert('請把這個按鈕「拖曳」到瀏覽器的書籤列，不要直接點。手機請用下方「複製書籤程式碼」。'); }
     if (t.id === 'bmCopy') { const ok = await copyText(bookmarkletHref()); t.textContent = ok ? '已複製' : '複製失敗'; }
     if (t.dataset.copy) {
@@ -831,6 +844,7 @@
     }
   });
   document.addEventListener('change', e => {
+    if (remote.change(e.target)) return;
     if (e.target.dataset.kset !== undefined) { S.kActive = e.target.value; if (S.step === 'calc') render(); }
     if (e.target.dataset.escrsc !== undefined) S.escrsConstants = e.target.checked;
   });

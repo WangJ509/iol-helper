@@ -6,3 +6,6 @@
 *.heic
 !app/favicon-32.png
 !app/apple-touch-icon.png
+
+__pycache__/
+*.pyc
