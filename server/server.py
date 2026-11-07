@@ -16,10 +16,12 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import threading
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+from calculations import calculate, InputError
 
 ROOT = Path(__file__).resolve().parent.parent
 MOUNTS = {"/formulas/": ROOT / "formulas", "/": ROOT / "app"}
@@ -27,6 +29,7 @@ HOST = os.environ.get("IOL_HOST", "127.0.0.1")
 PORT = int(os.environ.get("IOL_PORT", "8766"))
 MAX_UPLOAD = int(os.environ.get("IOL_MAX_UPLOAD_MB", "25")) * 1024 * 1024
 OCR_CMD = os.environ.get("IOL_OCR_CMD", "").strip()
+CALC_SLOTS = threading.BoundedSemaphore(4)
 
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("application/wasm", ".wasm")
@@ -64,10 +67,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if urlparse(self.path).path == "/api/config":
-            return self._json({"serverOcr": bool(OCR_CMD)})
+            return self._json({"serverOcr": bool(OCR_CMD), "remoteCalculations": True})
         return super().do_GET()
 
     def do_POST(self):
+        if urlparse(self.path).path == "/api/calculations":
+            return self._calculate()
         if urlparse(self.path).path != "/api/ocr":
             return self.send_error(HTTPStatus.NOT_FOUND)
         if not OCR_CMD:
@@ -94,6 +99,31 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError:
             return self._json({"error": "OCR 輸出格式錯誤"}, HTTPStatus.INTERNAL_SERVER_ERROR)
         return self._json(result)
+
+    def _calculate(self):
+        origin = self.headers.get("Origin")
+        if origin and urlparse(origin).netloc != self.headers.get("Host", ""):
+            return self._json({"error": "來源不符"}, HTTPStatus.FORBIDDEN)
+        if self.headers.get_content_type() != "application/json":
+            return self._json({"error": "只接受 JSON"}, HTTPStatus.UNSUPPORTED_MEDIA_TYPE)
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return self._json({"error": "請求長度格式不符"}, HTTPStatus.BAD_REQUEST)
+        if not 0 < length <= 16384:
+            return self._json({"error": "請求大小不符"}, HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+        try:
+            body = json.loads(self.rfile.read(length))
+        except (ValueError, UnicodeError):
+            return self._json({"error": "JSON 格式不符"}, HTTPStatus.BAD_REQUEST)
+        if not CALC_SLOTS.acquire(blocking=False):
+            return self._json({"error": "查詢忙碌中，請稍後重試"}, HTTPStatus.TOO_MANY_REQUESTS)
+        try:
+            return self._json(calculate(body))
+        except InputError as error:
+            return self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+        finally:
+            CALC_SLOTS.release()
 
     def _json(self, obj, status=HTTPStatus.OK):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
