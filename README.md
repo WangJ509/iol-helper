@@ -22,7 +22,7 @@ IOL_HOST=0.0.0.0 IOL_PORT=8766 python3 server/server.py
 3. 網址是 `https://<帳號>.github.io/<repo>/`，會自動導向 `app/`；內建公式計算機在 `formulas/calculator.html`。
 
 Pages 版和伺服器版功能相同，主要差別：
-- 遠端公式查詢需要 Python／Docker 後端，GitHub Pages 靜態版不支援。
+- 遠端公式查詢需要 Python／Docker 後端；GitHub Pages 靜態版不顯示此區塊。
 - 不支援伺服器端 OCR（`IOL_OCR_CMD`），一律在瀏覽器內辨識。
 - 無法自訂回應標頭（no-store 等），頁面內已用 meta 設定 no-referrer。
 
@@ -105,3 +105,11 @@ python3 tests/calculation-tests.py
 python3 tests/server-tests.py
 node tests/remote-tests.js
 ```
+
+## NAS 部署
+
+正式服務使用 Portainer 的 `iol-helper` stack，Compose 範本在 `deploy/nas.compose.yml`，原始碼先同步到 `/volume1/jason/projects/iol-helper`。網站為 `https://iol.wombatwang.com/`，沿用 Traefik 的 HTTPS 與 Authelia；帳號允許規則維護在 NAS 的 Authelia 設定，不放在此 repo。
+
+容器非 root、根檔案系統唯讀、不掛載病患資料，HTTP 只在容器網路對 Traefik 開放。復原埠 `127.0.0.1:8793` 僅 NAS 本機可用，不對 LAN／WAN 直接開放。Synology 舊核心不支援 CPU CFS 與 PID 配額，改用支援的 CPU shares 與 256 MB 記憶體限制。Dockerfile 固定 Python Bookworm 版本，並在映像內設定程式檔讀取權限，避免 SMB／NAS ACL 被帶入後讓 nobody 無法啟動。
+
+更新時使用新映像標籤，保留前一版映像及 Compose；只更新此 stack，不刪除資料。若停用此服務，保留 Authelia 的預設拒絕原則，不能移除 middleware 來排除登入問題。
