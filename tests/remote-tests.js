@@ -33,6 +33,11 @@ assert.equal(display(null), '—');
     assert.ok(remote.render(active).includes('-0.23'));
     remote.change({ dataset: { remote: 'constant', provider: 'cooke' }, value: '119.1' });
     assert.ok(!remote.render(active).includes('作者網站回傳的標準 SE 預測（D）'));
-    console.log('Remote tests passed: payload privacy, rounding, stale responses, settings invalidation.');
+    global.fetch = async () => ({ ok: false });
+    const staticRemote = create(() => context, () => {});
+    assert.equal(staticRemote.render(context), '');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(staticRemote.render(context), '');
+    console.log('Remote tests passed: privacy, stale responses, settings invalidation, hidden static section.');
   } finally { global.fetch = oldFetch; }
 })().catch(error => { console.error(error); process.exitCode = 1; });

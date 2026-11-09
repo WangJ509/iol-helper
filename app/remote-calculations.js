@@ -31,6 +31,8 @@
       return result && result.signature === signature(context, requestFor(id, context)) ? result.value : null;
     }
     function render(context) {
+      // 靜態版沒有查詢後端，整個區塊不顯示。
+      if (state.available !== true) return '';
       const blocked = !state.available || context.blockers.length || !state.consent;
       const select = (id, field, options, value) => `<select data-remote="${field}" data-provider="${id}"><option value="">請選擇</option>${Object.entries(options).map(([v, label]) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select>`;
       const resultById = Object.fromEntries(Object.keys(providers).map(id => [id, current(id, context)]));

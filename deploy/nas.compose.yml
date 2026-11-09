@@ -1,0 +1,44 @@
+services:
+  app:
+    build:
+      context: /volume1/jason/projects/iol-helper
+      dockerfile: Dockerfile
+    image: iol-helper:20261109-v2
+    restart: unless-stopped
+    environment:
+      IOL_HOST: 0.0.0.0
+      IOL_PORT: '8766'
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUNBUFFERED: '1'
+    ports:
+      - '127.0.0.1:8793:8766'
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpu_shares: 256
+    healthcheck:
+      test: ['CMD', 'python3', '-c', 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8766/api/config", timeout=3).read()']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - proxy
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: proxy
+      traefik.http.routers.iol-helper.rule: Host(`iol.wombatwang.com`)
+      traefik.http.routers.iol-helper.entrypoints: websecure
+      traefik.http.routers.iol-helper.tls: 'true'
+      traefik.http.routers.iol-helper.tls.certresolver: letsencrypt
+      traefik.http.routers.iol-helper.middlewares: authelia@docker
+      traefik.http.routers.iol-helper.service: iol-helper
+      traefik.http.services.iol-helper.loadbalancer.server.port: '8766'
+networks:
+  proxy:
+    external: true
