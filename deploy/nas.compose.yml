@@ -3,7 +3,7 @@ services:
     build:
       context: /volume1/jason/projects/iol-helper
       dockerfile: Dockerfile
-    image: iol-helper:20261109-v2
+    image: iol-helper:20261110-v3
     restart: unless-stopped
     environment:
       IOL_HOST: 0.0.0.0

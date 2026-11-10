@@ -26,7 +26,7 @@ Pages 版和伺服器版功能相同，主要差別：
 - 不支援伺服器端 OCR（`IOL_OCR_CMD`），一律在瀏覽器內辨識。
 - 無法自訂回應標頭（no-store 等），頁面內已用 meta 設定 no-referrer。
 
-照片、PDF 與核對紀錄預設留在瀏覽器記憶體，不會傳到 GitHub。按遠端查詢時，已核對的測量值會經自架後端送至所選作者網站；不傳送 PDF、影像、病歷號、姓名或檔名，後端不保存請求或結果。`.gitignore` 已排除 PDF 與圖片檔，避免不小心把報告推上公開 repo。
+照片、PDF 與核對紀錄預設留在瀏覽器記憶體，不會傳到 GitHub。「記住這片鏡片的設定」是選用功能，只在此瀏覽器保存鏡片對應的公式模型與常數，不保存病患或量測資料。按遠端查詢時，已核對的測量值會經自架後端送至所選作者網站；不傳送 PDF、影像、病歷號、姓名或檔名，後端不保存請求或結果。`.gitignore` 已排除 PDF 與圖片檔，避免不小心把報告推上公開 repo。
 
 部署到伺服器時請放在 HTTPS 反向代理（nginx／Caddy）後面：瀏覽器的剪貼簿 API 只在 HTTPS 或 localhost 可用，「複製資料到官網」需要它。伺服器沒有帳號系統，請限制在院內網路或加上代理層驗證。
 
@@ -85,7 +85,20 @@ node formulas/formula-tests.js    # 或 Mac：osascript -l JavaScript formulas/f
 
 ## 遠端公式結果
 
-在「計算與官網」頁，完成必要人工核對、確認無角膜屈光手術、使用光學量測後，選擇儀器類別與各來源的模型／家族及常數，再同意傳送資料並按查詢。標準 SE 不含 Toric 柱鏡及屈光術後計算。
+在核對頁選鏡片，進入「計算與官網」後會依同一片鏡片帶入各公式的模型／家族及官網預設常數。儀器類別依所選眼軸報告帶入：IOLMaster → Other、Lenstar → Lenstar、Argos → Argos；未知儀器保持空白。完成必要人工核對、確認無角膜屈光手術、使用光學量測後，再同意傳送資料並按查詢。標準 SE 不含 Toric 柱鏡及屈光術後計算。
+
+鏡片對照以製造商及型號精確配對，資料在 `app/lens-presets.js`，來源快照雜湊及對照值在 `tests/fixtures/lens-source-evidence.json`，2026-11-10 直接核對作者網站的公開預設值：
+
+- [Cooke](https://cookeformula.com/)：公開前端 `getDefault` 中各鏡片的家族與 A 常數。
+- [Hoffer QST](https://hofferqst.com/)：公開前端 `options_SE_IOLS` 中的 pACD。
+- [PEARL-DGS](https://iolsolver.com/regular)：公開前端 `IOLModelItems` 中的模型及 A 常數。
+- [EVO](https://www.evoiolcalculator.com/Calculator.aspx)：正常 GET 表單後選擇該型號、POST 選單事件，由回傳表單讀取預設 A 常數；不進行 CAPTCHA 繞過。
+
+目前精確對照包含 AAB00、ICB00、MX60、MA60AC、MA60MA、SN60WF、ZCB00、SA60AT；其中 SN60WF、ZCB00、SA60AT 具四公式完整預設。另外新增這三種鏡片到上方選單，其光學 A 參考 EVO 官網，明確標示不是院內原表，A-scan 值保持空白。未列型號或名稱不完整的鏡片維持手動設定，不能由相似名稱猜測；例如 ICB00 不會誤套 PEARL 的 PCB00/ZCB00。
+
+缺少常數時會顯示待補，未完成的公式不會送出；其他完成的公式仍可查詢。A 常數可按「沿用上方光學 A」明確選用院內／使用者的光學 SRK/T 常數，畫面標示來源且隨上方數值連動；Hoffer 不提供此按鈕，也不從 A 常數推算 pACD。選擇另一模型會清空原模型常數，避免不相符設定。
+
+手動修正後可選「記住這片鏡片的設定」，只儲存有效公式的模型與常數。下次選相同鏡片會帶入，換鏡片不沿用；「恢復官網預設值」只更改目前畫面，「清除已記住的設定」刪除此鏡片的瀏覽器偏好。瀏覽器不允許儲存時仍能完成本次查詢。新個案重新取得資料傳送同意；更換鏡片會中止舊查詢並清除結果，慢回應無法覆蓋新設定。
 
 - Cooke K6 2024.01：JSON 術前 API，使用自己的 A-constant 與鏡片家族。
 - Hoffer QST：`/compute`，使用 pACD，不能用 A-constant 代填。
