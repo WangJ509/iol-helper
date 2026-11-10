@@ -52,6 +52,19 @@ class CalculationTests(unittest.TestCase):
         with self.assertRaises(InputError): validate(request)
         request = body(); request['formula'] = 'http://127.0.0.1/'
         with self.assertRaises(InputError): validate(request)
+    def test_official_presets_match_backend_model_allowlists(self):
+        evidence = json.loads((FIXTURES / 'lens-source-evidence.json').read_text())
+        for lens, entries in evidence['entries'].items():
+            for name, setting in entries.items():
+                if setting['constant'] is None:
+                    continue
+                with self.subTest(lens=lens, formula=name):
+                    request = body(name); request['settings'] = {'model': setting['model'], 'constant': setting['constant']}
+                    self.assertEqual(validate(request)[2], request['settings'])
+        request = body('evo'); request['settings'] = {'model': 'Eyhance', 'constant': 119.3}
+        opener = FakeOpener('<input type="hidden" name="__VIEWSTATE" value="fresh">', '<table class="pred"><tr><td>20</td><td>-0.21</td></tr></table>')
+        self.assertEqual(calculate(request, opener)['status'], 'ok')
+        self.assertIn(b'DropDownIOLModel=Eyhance', opener.requests[1].data)
     def test_missing_optional_values_are_not_sent_as_zero(self):
         request = body(); request['measurements']['LT'] = None
         opener = FakeOpener((FIXTURES / 'cooke.json').read_bytes()); calculate(request, opener)

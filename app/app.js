@@ -460,11 +460,12 @@
     if (ascanDoc && L.alSource !== 'ascan') msgs.push('眼軸來源報告標記為 A-scan，請確認是否應改用 A-scan 常數。');
     return `<div class="sec"><h3>鏡片與常數</h3>
       <div class="grid2">
-        <label class="f" style="grid-column:1/-1">鏡片（IOL constant.pdf）<select data-l="idx"><option value="">— 請選擇 —</option>
+        <label class="f" style="grid-column:1/-1">鏡片（院內表／官網參考值）<select data-l="idx"><option value="">— 請選擇 —</option>
           ${IOL_CONSTANTS.map((k, i) => `<option value="${i}" ${String(L.idx) === String(i) ? 'selected' : ''} ${k.status === 'excluded' ? 'disabled' : ''}>${esc(k.maker)} ${esc(k.model)}（A-scan ${k.ascan ?? '缺'}／SRK/T ${k.srkt ?? '缺'}）${k.status === 'excluded' ? '－停用' : ''}</option>`).join('')}</select></label>
         <label class="f">眼軸來源<select data-l="alSource"><option value="optical" ${L.alSource === 'optical' ? 'selected' : ''}>光學（IOLMaster 等）→ SRK/T 欄</option><option value="ascan" ${L.alSource === 'ascan' ? 'selected' : ''}>A-scan → A-scan 欄</option></select></label>
         <label class="f">使用的 A 常數<input type="number" step="0.01" data-l="A" value="${L.A ?? ''}"></label>
       </div>
+      ${c && c.source ? `<p class="small muted">此鏡片光學 A 常數來自 <a href="${esc(c.source)}" target="_blank" rel="noopener noreferrer">${esc(c.sourceLabel)}</a>，不是院內原表；遠端公式依各自對照帶入。</p>` : ''}
       ${msgs.map(m => `<div class="msg warn small">${esc(m)}</div>`).join('')}
       ${c && c.status === 'unclear' ? `<label class="row small"><input type="checkbox" data-l="confirmUnclear" ${L.confirmUnclear ? 'checked' : ''}>我已向原始資料確認此常數</label>` : ''}</div>`;
   }
@@ -674,7 +675,11 @@
     if (missing.length) blockers.push('請先完成必要核對：' + missing.join('、'));
     if (S.history.type !== 'none') blockers.push('遠端查詢目前僅支援已確認無角膜屈光手術的標準 SE');
     if (S.lens.alSource !== 'optical') blockers.push('目前遠端查詢只支援光學生物測量，A-scan 請使用官網');
-    return { data: payload(), history: S.history.type, caseKey: S.remoteCaseKey, blockers };
+    const lens = IOL_CONSTANTS[S.lens.idx];
+    const alDoc = S.docs.find(d => d.id === (S.items['bio:AL'] || {}).docId);
+    return { data: payload(), history: S.history.type, caseKey: S.remoteCaseKey, blockers,
+      lens: lens ? { maker: lens.maker, model: lens.model, alSource: S.lens.alSource } : null,
+      biometer: alDoc ? ({ IOLMaster: 'Other', Lenstar: 'Lenstar', Argos: 'Argos' })[alDoc.device] || '' : '' };
   }
   function bookmarkletHref() {
     // 去掉縮排與整行註解以縮短書籤（保留換行，避免改變語意）
@@ -811,6 +816,8 @@
     const t = e.target;
     const remoteButton = t.closest('[data-remote-query]');
     if (remoteButton && !remoteButton.disabled) remote.query(remoteButton.dataset.remoteQuery);
+    const remoteAction = t.closest('[data-remote-action]');
+    if (remoteAction) remote.action(remoteAction.dataset.remoteAction, remoteAction.dataset.provider);
     if (t.id === 'bmLink') { e.preventDefault(); alert('請把這個按鈕「拖曳」到瀏覽器的書籤列，不要直接點。手機請用下方「複製書籤程式碼」。'); }
     if (t.id === 'bmCopy') { const ok = await copyText(bookmarkletHref()); t.textContent = ok ? '已複製' : '複製失敗'; }
     if (t.dataset.copy) {

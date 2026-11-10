@@ -1,6 +1,7 @@
 /*
  * 依「IOL constant.pdf」（桌面 R1眼科）建立。欄位：ascan = A-scan 欄、srkt = SRK/T（光學）欄。
  * 原表空白、「?」、「___」、「..」一律記為 null 並加註，不補猜。
+ * 另增官網有完整遠端對照的型號：以 source 標示參考值來源，沒有 A-scan 值。
  * status：ok = 兩欄皆有值；partial = 只有一欄；unclear = 需確認；excluded = 原表刪除線或非 IOL。
  */
 (function (root) {
@@ -36,6 +37,9 @@
     { maker: '辛生／樂敦', model: 'Ray-61PL / 62L', note: '四腳／兩腳；A-scan 欄為「___」', ascan: null, srkt: 118.0, status: 'partial' },
     { maker: 'Artisan', model: '前', note: '', ascan: 115.0, srkt: 115.7, status: 'ok' },
     { maker: 'Artisan', model: '後（主要用後夾式）', note: '', ascan: 116.8, srkt: 116.9, status: 'ok' },
+    { maker: 'Alcon', model: 'SN60WF', note: '官網參考值（非院內原表）；2026-11-10 核對', ascan: null, srkt: 119, status: 'partial', source: 'https://www.evoiolcalculator.com/Calculator.aspx', sourceLabel: 'EVO 官網 SN60WF 光學預設值' },
+    { maker: 'AMO', model: 'ZCB00', note: '官網參考值（非院內原表）；2026-11-10 核對', ascan: null, srkt: 119.3, status: 'partial', source: 'https://www.evoiolcalculator.com/Calculator.aspx', sourceLabel: 'EVO 官網 ZCB00 光學預設值' },
+    { maker: 'Alcon', model: 'SA60AT', note: '官網參考值（非院內原表）；2026-11-10 核對', ascan: null, srkt: 118.8, status: 'partial', source: 'https://www.evoiolcalculator.com/Calculator.aspx', sourceLabel: 'EVO 官網 SA60AT 光學預設值' },
   ];
   root.IOL_CONSTANTS = C;
   if (typeof module === 'object' && module.exports) module.exports = C;

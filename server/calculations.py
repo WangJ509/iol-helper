@@ -17,7 +17,7 @@ SOURCES = {
 }
 COOKE_FAMILIES = {'Other', 'JAndJ1PieceTecnisOrSensar', 'ZeissPlateHaptic', 'AlconMA60MA', 'AlconSA60AT', 'EnvistaEnhanced'}
 PEARL_MODELS = {'Other_Men', 'SN60WF', 'Finevision', 'Panoptix', 'Vivinex', 'PCB', 'MX60', 'SA60AT', 'Asphina', '60MA', 'A1-UV', 'AR40', 'RayOne'}
-EVO_MODELS = {'Standard', 'Tecnis', 'AR40e/E/M', 'MA60MA', 'SA60AT', 'SA60WF', 'SN60WF', 'CNA0T0', 'Vivity', 'Panoptix', 'ZCB00'}
+EVO_MODELS = {'Standard', 'Tecnis', 'AR40e/E/M', 'MA60MA', 'SA60AT', 'SA60WF', 'SN60WF', 'CNA0T0', 'Vivity', 'Panoptix', 'ZCB00', 'Eyhance'}
 LIMITS = {'AL': (12, 40), 'K1': (30, 65), 'K2': (30, 65), 'ACD': (1.1, 6),
           'LT': (2, 8), 'CCT': (250, 850), 'WTW': (8, 16), 'target': (-10, 10)}
 TIMEOUT = 18
