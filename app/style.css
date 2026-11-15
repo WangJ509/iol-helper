@@ -187,7 +187,11 @@ td.flag { color: var(--bad); font-weight: 700; }
 .remote-cards { margin:12px 0; align-items:stretch; }
 .remote-cards .f { display:flex; flex-direction:column; margin:8px 0; }
 .remote-cards select { width:100%; min-width:0; }
-.remote-table { overflow-x:auto; margin-top:16px; }
-.remote-table table { min-width:540px; }
+.remote-table { width:560px; max-width:100%; overflow-x:auto; margin-top:16px; }
+.remote-table table.t { min-width:480px; table-layout:fixed; }
+.remote-table table.t th, .remote-table table.t td { padding:4px 10px; white-space:nowrap; }
+.remote-table table.t th:first-child { width:76px; }
+.remote-table tbody tr:nth-child(even) { background:var(--soft); }
+.remote-table tbody tr:hover { background:var(--hl-soft); }
 .remote-table caption { text-align:left; padding:8px 0; font-weight:600; }
 .remote-error { color:#a32323; }
